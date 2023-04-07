@@ -15,7 +15,7 @@ services:
       - php
   postgres:
     ports:  #Нельзя использовать проброс портов на реальном проекте
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5434:5432"
     image: postgres:alpine
     volumes:
       - postgres:/var/lib/postgresql/data
@@ -28,7 +28,7 @@ services:
     user: ${UID:-1000}:${GID:-1000}
     volumes:
       - ${PWD}:/app
-      - ${HOME}:/.composer
+      - ${HOME}/composer/.composer:/.composer
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
     links:

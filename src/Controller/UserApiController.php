@@ -226,6 +226,7 @@ class UserApiController extends AbstractController
 
         $newUser = User::fromDTO($userDto);
         $newUser->setPassword($this->hasher->hashPassword($newUser, $userDto->password));
+        $newUser->setRoles(['ROLE_USER']);
         $userRepository->add($newUser, true);
 
         return new JsonResponse([

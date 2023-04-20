@@ -5,8 +5,13 @@ namespace App\Controller;
 use App\DTO\UserDTO;
 use App\Entity\User;
 use App\Repository\UserRepository;
+use Gesdinet\JWTRefreshTokenBundle\Generator\RefreshTokenGeneratorInterface;
+use Gesdinet\JWTRefreshTokenBundle\Model\RefreshTokenManagerInterface;
 use JMS\Serializer\Serializer;
 use JMS\Serializer\SerializerBuilder;
+use Lexik\Bundle\JWTAuthenticationBundle\Encoder\JWTEncoderInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Encoder\LcobucciJWTEncoder;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWSProvider\JWSProviderInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Nelmio\ApiDocBundle\Annotation\Security;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -19,7 +24,6 @@ use OpenApi\Annotations as OA;
 use Nelmio\ApiDocBundle\Annotation\Model;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
-use Lexik\Bundle\JWTAuthenticationBundle\Encoder\LcobucciJWTEncoder;
 
 /**
  * @Route("/api/v1")
@@ -153,6 +157,10 @@ class UserApiController extends AbstractController
      *        @OA\Property(
      *          property="token",
      *          type="string",
+     *        ),
+     *        @OA\Property(
+     *          property="refresh_token",
+     *          type="string",
      *        )
      *     )
      * )
@@ -198,7 +206,11 @@ class UserApiController extends AbstractController
      * )
      * @OA\Tag(name="UserApi")
      */
-    public function register(Request $request, UserRepository $userRepository): JsonResponse {
+    public function register(
+        Request $request,
+        UserRepository $userRepository,
+        RefreshTokenGeneratorInterface $refreshTokenGenerator,
+        RefreshTokenManagerInterface $refreshTokenManager): JsonResponse {
         $serializer = SerializerBuilder::create()->build();
         $userDto = $serializer->deserialize($request->getContent(), UserDto::class, 'json');
         $errors = $this->validator->validate($userDto);
@@ -228,9 +240,15 @@ class UserApiController extends AbstractController
         $newUser->setPassword($this->hasher->hashPassword($newUser, $userDto->password));
         $newUser->setRoles(['ROLE_USER']);
         $userRepository->add($newUser, true);
+        $refreshToken = $refreshTokenGenerator->createForUserWithTtl(
+            $newUser,
+            (new \DateTime())->modify('+1 month')->getTimestamp()
+        );
+        $refreshTokenManager->save($refreshToken);
 
         return new JsonResponse([
             'token' => $this->JWTTokenManager->create($newUser),
+            'refresh_token' => $refreshToken->getRefreshToken(),
         ], Response::HTTP_CREATED);
     }
 
@@ -285,6 +303,20 @@ class UserApiController extends AbstractController
      *        ),
      * )
      * )
+     * @OA\Response(
+     *     response="400-5xx",
+     *     description="Ответ при неизвестной ошибке",
+     *     @OA\JsonContent(
+     *       @OA\Property(
+     *          property="code",
+     *          type="string",
+     *        ),
+     *        @OA\Property(
+     *          property="message",
+     *          type="string",
+     *        ),
+     *     )
+     * )
      * @OA\Tag(name="UserApi")
      */
     public function currentUser(): JsonResponse
@@ -302,5 +334,74 @@ class UserApiController extends AbstractController
             'roles' => $this->getUser()->getRoles(),
             'balance' => $this->getUser()->getBalance(),
         ], Response::HTTP_OK);
+    }
+
+    /**
+     * @Route("/token/refresh", name="app_api_refresh_token", methods={"POST"})
+     * @OA\Post(
+     *     path="/api/v1/token/refresh",
+     *     summary="Обновление истёкших JWT токенов пользователей.",
+     *     description="Запрос обновляет JWT-токен пользователя, если он истёк.
+     * Если запрос происходит от пользователя, который неавторизирован, то будет сообщение о неверных данных."
+     * )
+     * @OA\RequestBody(
+     *     required=true,
+     *     @OA\JsonContent(
+     *        @OA\Property(
+     *          property="refresh_token",
+     *          type="string",
+     *          description="Токен обновления пользвателя",
+     *          example="some_token",
+     *        ),
+     *     )
+     *)
+     * @OA\Response(
+     *     response=200,
+     *     description="Успешный запрос на обновление токена",
+     *     @OA\JsonContent(
+     *        @OA\Property(
+     *          property="token",
+     *          type="string",
+     *        ),
+     *        @OA\Property(
+     *          property="refresh_token",
+     *          type="string",
+     *        ),
+     *     )
+     * )
+     * @OA\Response(
+     *     response=401,
+     *     description="Ответ при неудачном обновлении",
+     *     @OA\JsonContent(
+     *       @OA\Property(
+     *          property="code",
+     *          type="string",
+     *          example="401"
+     *        ),
+     *        @OA\Property(
+     *          property="message",
+     *          type="string",
+     *          example="Invalid credentials."
+     *        ),
+     *     )
+     * )
+     * @OA\Response(
+     *     response="400-5xx",
+     *     description="Ответ при неизвестной ошибке",
+     *     @OA\JsonContent(
+     *       @OA\Property(
+     *          property="code",
+     *          type="string",
+     *        ),
+     *        @OA\Property(
+     *          property="message",
+     *          type="string",
+     *        ),
+     *     )
+     * )
+     * @OA\Tag(name="UserApi")
+     */
+    public function refresh()
+    {
     }
 }

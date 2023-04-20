@@ -4,16 +4,31 @@ namespace App\DataFixtures;
 
 use App\Entity\User;
 use Doctrine\Bundle\FixturesBundle\Fixture;
+use Doctrine\Bundle\FixturesBundle\FixtureGroupInterface;
 use Doctrine\Persistence\ObjectManager;
+use Gesdinet\JWTRefreshTokenBundle\Generator\RefreshTokenGeneratorInterface;
+use Gesdinet\JWTRefreshTokenBundle\Model\RefreshTokenManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-class AppFixtures extends Fixture
+
+class UserFixtures extends Fixture implements FixtureGroupInterface
 {
+
+    public static function getGroups(): array
+    {
+        return ['group2'];
+    }
+
     private UserPasswordHasherInterface $hasher;
 
-    public function __construct(UserPasswordHasherInterface $hasher)
+    public function __construct(
+        UserPasswordHasherInterface $hasher,
+        RefreshTokenGeneratorInterface $refreshTokenGenerator,
+        RefreshTokenManagerInterface $refreshTokenManager)
     {
         $this->hasher = $hasher;
+        $this->refreshTokenGenerator = $refreshTokenGenerator;
+        $this->refreshTokenManager = $refreshTokenManager;
     }
 
     public function load(ObjectManager $manager): void

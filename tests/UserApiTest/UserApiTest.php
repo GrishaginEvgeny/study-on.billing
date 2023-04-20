@@ -11,7 +11,7 @@ class UserApiTest extends \App\Tests\AbstractTest
         ];
     protected function getFixtures(): array
     {
-        return [new \App\DataFixtures\AppFixtures($this->getContainer()->get(UserPasswordHasherInterface::class))];
+        return [new \App\DataFixtures\UserFixtures($this->getContainer()->get(UserPasswordHasherInterface::class))];
     }
 
     public function testInvalidCredentialsAuth(): void

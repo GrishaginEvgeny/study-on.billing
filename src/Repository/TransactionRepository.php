@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\Course;
 use App\Entity\Transaction;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -57,11 +58,11 @@ class TransactionRepository extends ServiceEntityRepository
         $query = $this->getEntityManager()->createQueryBuilder()
             ->select('t')
             ->from('App\Entity\Transaction', 't')
-            ->innerJoin('t.Course', 'c', Join::WITH)
+            ->leftJoin('t.Course', 'c', Join::WITH)
             ->andWhere('t.transactionUser = :user')
             ->setParameter('user', $user);
 
-        if($type) {
+        if(!is_null($type)) {
             $query->andWhere('t.type = :type')
                 ->setParameter('type', $type);
         }
@@ -73,11 +74,29 @@ class TransactionRepository extends ServiceEntityRepository
 
         if($skipExpired) {
             $query->andWhere('t.ValidTo > :now_date')
-                ->orWhere('t.ValidTo is NULL')
                 ->setParameter('now_date', new \DateTime('now'));
+            if(!$characterCode) {
+                $query->orWhere('t.ValidTo is NULL');
+            }
         }
 
         return $query->getQuery()->getResult();
+    }
+
+    /**
+     * @throws \Doctrine\ORM\NonUniqueResultException
+     */
+    public function getTransactionOnTypeRentWithMaxDate(Course $course, User $user) {
+        $query = $this->getEntityManager()->createQueryBuilder()
+            ->select('t')
+            ->from('App\Entity\Transaction', 't')
+            ->orderBy('t.ValidTo', 'DESC')
+            ->setMaxResults(1)
+            ->andWhere('t.transactionUser = :user')
+            ->setParameter('user', $user)
+            ->andWhere('t.Course = :course')
+            ->setParameter('course', $course);
+        return $query->getQuery()->getOneOrNullResult();
     }
 
 //    /**
@@ -94,7 +113,7 @@ class TransactionRepository extends ServiceEntityRepository
 //            ->getResult()
 //        ;
 //    }
-
+//
 //    public function findOneBySomeField($value): ?Transaction
 //    {
 //        return $this->createQueryBuilder('t')

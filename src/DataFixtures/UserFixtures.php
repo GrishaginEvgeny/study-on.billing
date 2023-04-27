@@ -3,6 +3,7 @@
 namespace App\DataFixtures;
 
 use App\Entity\User;
+use App\Services\PaymentService;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Bundle\FixturesBundle\FixtureGroupInterface;
 use Doctrine\Persistence\ObjectManager;
@@ -20,15 +21,18 @@ class UserFixtures extends Fixture implements FixtureGroupInterface
     }
 
     private UserPasswordHasherInterface $hasher;
+    private PaymentService $paymentService;
 
+    /**
+     * @param UserPasswordHasherInterface $hasher
+     * @param PaymentService $paymentService
+     */
     public function __construct(
         UserPasswordHasherInterface $hasher,
-        RefreshTokenGeneratorInterface $refreshTokenGenerator,
-        RefreshTokenManagerInterface $refreshTokenManager)
+        PaymentService $paymentService)
     {
         $this->hasher = $hasher;
-        $this->refreshTokenGenerator = $refreshTokenGenerator;
-        $this->refreshTokenManager = $refreshTokenManager;
+        $this->paymentService = $paymentService;
     }
 
     public function load(ObjectManager $manager): void
@@ -43,15 +47,31 @@ class UserFixtures extends Fixture implements FixtureGroupInterface
             ->setBalance(0.0);
 
         $admin = new User();
+
+        $newUser = new User();
+        $password = $this->hasher->hashPassword($newUser, 'user');
+        $newUser
+            ->setEmail('newuser@study.com')
+            ->setPassword($password)
+            ->setRoles(['ROLE_USER'])
+            ->setBalance(0.0);
+
+
         $password = $this->hasher->hashPassword($admin, 'admin');
         $admin
             ->setEmail('admin@study.com')
             ->setPassword($password)
             ->setRoles(['ROLE_SUPER_ADMIN'])
-            ->setBalance(1111111110.0);
+            ->setBalance(0.0);
 
         $manager->persist($user);
         $manager->persist($admin);
+        $manager->persist($newUser);
+
+        $this->paymentService->makeDeposit($user, $_ENV['BASE_BALANCE']);
+        $this->paymentService->makeDeposit($newUser, $_ENV['BASE_BALANCE']);
+        $this->paymentService->makeDeposit($admin, 111111111111.0);
+
         $manager->flush();
     }
 }

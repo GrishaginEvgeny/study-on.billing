@@ -21,6 +21,8 @@ class CourseFixtures extends Fixture implements FixtureGroupInterface
             'pythonDeveloper' => new Course(),
             'layoutDesigner' => new Course(),
             'webDeveloper' => new Course(),
+            'testForMoney1' => new Course(),
+            'testForMoney2' => new Course(),
         ];
 
         $courses['pythonDeveloper']
@@ -37,6 +39,17 @@ class CourseFixtures extends Fixture implements FixtureGroupInterface
             ->setCharacterCode('webdev')
             ->setType(3)
             ->setCost(199.99);
+
+        $courses['testForMoney1']
+            ->setCharacterCode('forMoney1')
+            ->setType(3)
+            ->setCost(1990.99);
+
+        $courses['testForMoney2']
+            ->setCharacterCode('forMoney2')
+            ->setType(2)
+            ->setCost(1100.99);
+
 
         foreach ($courses as $course) {
             $manager->persist($course);

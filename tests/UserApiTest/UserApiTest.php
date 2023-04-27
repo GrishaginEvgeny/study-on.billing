@@ -11,14 +11,17 @@ class UserApiTest extends \App\Tests\AbstractTest
         ];
     protected function getFixtures(): array
     {
-        return [new \App\DataFixtures\UserFixtures($this->getContainer()->get(UserPasswordHasherInterface::class))];
+        $paymentService = $this->getContainer()->get(\App\Services\PaymentService::class);
+        $userPassHasher = $this->getContainer()->get(UserPasswordHasherInterface::class);
+        return [new \App\DataFixtures\UserFixtures($userPassHasher, $paymentService),
+            new \App\DataFixtures\CourseFixtures()];
     }
 
     public function testInvalidCredentialsAuth(): void
     {
         $client = $this->getClient();
         $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],  json_encode(['username'=> '123', 'password' => '123']));
-        $arrayedContent = (array)json_decode($client->getResponse()->getContent());
+        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
         $this->assertSame("Invalid credentials.", $arrayedContent['message']);
         $this->assertResponseCode(401);
     }
@@ -29,7 +32,7 @@ class UserApiTest extends \App\Tests\AbstractTest
         foreach ($this->usersCredentials as $user){
             $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
                 json_encode(['username'=> $user['username'], 'password' => $user['password']]));
-            $arrayedContent = (array)json_decode($client->getResponse()->getContent());
+            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
             $this->assertResponseCode(200);
             $this->assertArrayHasKey('token', $arrayedContent);
         }
@@ -39,7 +42,7 @@ class UserApiTest extends \App\Tests\AbstractTest
         $client = $this->getClient();
         $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
             json_encode(['username'=> '123', 'password' => 'ASDVsas123.']));
-        $arrayedContent = (array)json_decode($client->getResponse()->getContent());
+        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
         $arrayedContent['errors'] = (array)$arrayedContent['errors'];
         $this->assertSame("Ошибка регистрации", $arrayedContent['error_description']);
         $this->assertNotEquals(0, count($arrayedContent['errors']));
@@ -51,7 +54,7 @@ class UserApiTest extends \App\Tests\AbstractTest
         $client = $this->getClient();
         $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
             json_encode(['username'=> '', 'password' => 'ASDVsas123.']));
-        $arrayedContent = (array)json_decode($client->getResponse()->getContent());
+        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
         $arrayedContent['errors'] = (array)$arrayedContent['errors'];
         $this->assertSame("Ошибка регистрации", $arrayedContent['error_description']);
         $this->assertNotEquals(0, count($arrayedContent['errors']));
@@ -63,7 +66,7 @@ class UserApiTest extends \App\Tests\AbstractTest
         $client = $this->getClient();
         $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
             json_encode(['username'=> 'test@test.test', 'password' => 'dasdadadsa']));
-        $arrayedContent = (array)json_decode($client->getResponse()->getContent());
+        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
         $arrayedContent['errors'] = (array)$arrayedContent['errors'];
         $this->assertSame("Ошибка регистрации", $arrayedContent['error_description']);
         $this->assertNotEquals(0, count($arrayedContent['errors']));
@@ -77,7 +80,7 @@ class UserApiTest extends \App\Tests\AbstractTest
         $client = $this->getClient();
         $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
             json_encode(['username'=> 'test@test.test', 'password' => 'Aa1.']));
-        $arrayedContent = (array)json_decode($client->getResponse()->getContent());
+        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
         $arrayedContent['errors'] = (array)$arrayedContent['errors'];
         $this->assertSame("Ошибка регистрации", $arrayedContent['error_description']);
         $this->assertNotEquals(0, count($arrayedContent['errors']));
@@ -92,16 +95,17 @@ class UserApiTest extends \App\Tests\AbstractTest
         $client = $this->getClient();
         $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
             json_encode(['username'=> 'usernotindb@test.test', 'password' => 'Aa111Bb.']));
-        $arrayedContent = (array)json_decode($client->getResponse()->getContent());
+        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseCode(201);
         $this->assertArrayHasKey('token', $arrayedContent);
+        $this->assertArrayHasKey('refresh_token', $arrayedContent);
     }
 
     public function testGetUserWithUnAuth(){
         $client = $this->getClient();
         $client->request('GET', '/api/v1/users/current');
         $this->assertResponseCode(401);
-        $arrayedContent = (array)json_decode($client->getResponse()->getContent());
+        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('message', $arrayedContent);
         $this->assertSame("JWT Token not found", $arrayedContent['message']);
     }
@@ -111,12 +115,12 @@ class UserApiTest extends \App\Tests\AbstractTest
         foreach ($this->usersCredentials as $user){
             $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
                 json_encode(['username'=> $user['username'], 'password' => $user['password']]));
-            $arrayedContent = (array)json_decode($client->getResponse()->getContent());
+            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
             $this->assertResponseCode(200);
             $this->assertArrayHasKey('token', $arrayedContent);
             $client->request('GET', '/api/v1/users/current',[],[],['HTTP_AUTHORIZATION' => 'Bearer '. $arrayedContent['token']]);
             $this->assertResponseCode(200);
-            $arrayedContent = (array)json_decode($client->getResponse()->getContent());
+            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
             $this->assertSame($user['username'], $arrayedContent['username']);
             $userFromRepository = static::getContainer()->get(UserRepository::class)
                 ->findOneBy(['email' => $arrayedContent['username']]);
@@ -124,5 +128,40 @@ class UserApiTest extends \App\Tests\AbstractTest
             $this->assertSame($userFromRepository->getRoles(), $arrayedContent['roles']);
             $this->assertEquals($userFromRepository->getBalance(), $arrayedContent['balance']);
         }
+    }
+
+    public function testResfreshSuccessfully(){
+            $client = $this->getClient();
+            $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username'=> 'usernotindb@test.test', 'password' => 'Aa111Bb.']));
+            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertResponseCode(201);
+            $this->assertArrayHasKey('token', $arrayedContent);
+            $this->assertArrayHasKey('refresh_token', $arrayedContent);
+            $client->request('POST', '/api/v1/token/refresh',[],[],
+                ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['refresh_token'=> $arrayedContent['refresh_token']]));
+            $this->assertResponseCode(200);
+            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $arrayedContent);
+            $this->assertArrayHasKey('refresh_token', $arrayedContent);
+    }
+
+    public function testResfreshWithWrongToken(){
+        $client = $this->getClient();
+        $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['username'=> 'usernotindb@test.test', 'password' => 'Aa111Bb.']));
+        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
+        $this->assertResponseCode(201);
+        $this->assertArrayHasKey('token', $arrayedContent);
+        $this->assertArrayHasKey('refresh_token', $arrayedContent);
+        $client->request('POST', '/api/v1/token/refresh',[],[],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['refresh_token'=> '123123']));
+        $this->assertResponseCode(401);
+        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('code', $arrayedContent);
+        $this->assertArrayHasKey('message', $arrayedContent);
+        $this->assertEquals('JWT Refresh Token Not Found', $arrayedContent['message']);
     }
 }

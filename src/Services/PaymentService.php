@@ -58,9 +58,6 @@ class PaymentService
     public function makePayment(User $user, Course $course): ?Transaction
     {
         try {
-            if ($user->getBalance() < $course->getCost()) {
-                throw new \Exception('На счету недостаточно средств.');
-            }
             $this->entityManager->getConnection()->beginTransaction();
             $transaction = new Transaction();
             $transaction
@@ -80,7 +77,7 @@ class PaymentService
             return $transaction;
         } catch (\Exception $e) {
             $this->entityManager->getConnection()->rollBack();
-            throw new \Exception($e->getMessage());
+            throw new \RuntimeException($e->getMessage());
         }
     }
 }

@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\DTO\UserDTO;
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Services\PaymentService;
 use Gesdinet\JWTRefreshTokenBundle\Generator\RefreshTokenGeneratorInterface;
 use Gesdinet\JWTRefreshTokenBundle\Model\RefreshTokenManagerInterface;
 use JMS\Serializer\Serializer;
@@ -125,7 +126,6 @@ class UserApiController extends AbstractController
 
     /**
      * @Route("/register", name="app_user_api_register", methods={"POST"})
-
      * @OA\Post(
      *     path="/api/v1/register",
      *     summary="Регистрация пользователя",
@@ -205,14 +205,16 @@ class UserApiController extends AbstractController
      *     )
      * )
      * @OA\Tag(name="UserApi")
+     * @throws \Doctrine\DBAL\Exception
      */
     public function register(
         Request $request,
         UserRepository $userRepository,
         RefreshTokenGeneratorInterface $refreshTokenGenerator,
-        RefreshTokenManagerInterface $refreshTokenManager): JsonResponse {
+        RefreshTokenManagerInterface $refreshTokenManager,
+        PaymentService $paymentService): JsonResponse {
         $serializer = SerializerBuilder::create()->build();
-        $userDto = $serializer->deserialize($request->getContent(), UserDto::class, 'json');
+        $userDto = $serializer->deserialize($request->getContent(), UserDTO::class, 'json');
         $errors = $this->validator->validate($userDto);
         if(count($errors) > 0) {
             $jsonedError = [];
@@ -245,6 +247,8 @@ class UserApiController extends AbstractController
             (new \DateTime())->modify('+1 month')->getTimestamp()
         );
         $refreshTokenManager->save($refreshToken);
+        $paymentService->makeDeposit($newUser, $_ENV['BASE_BALANCE']);
+
 
         return new JsonResponse([
             'token' => $this->JWTTokenManager->create($newUser),
@@ -338,6 +342,7 @@ class UserApiController extends AbstractController
 
     /**
      * @Route("/token/refresh", name="app_api_refresh_token", methods={"POST"})
+     *
      * @OA\Post(
      *     path="/api/v1/token/refresh",
      *     summary="Обновление истёкших JWT токенов пользователей.",
@@ -370,7 +375,7 @@ class UserApiController extends AbstractController
      *     )
      * )
      * @OA\Response(
-     *     response=401,
+     *     response="401/1",
      *     description="Ответ при неудачном обновлении",
      *     @OA\JsonContent(
      *       @OA\Property(
@@ -382,6 +387,22 @@ class UserApiController extends AbstractController
      *          property="message",
      *          type="string",
      *          example="Invalid credentials."
+     *        ),
+     *     )
+     * )
+     * @OA\Response(
+     *     response="401/2",
+     *     description="Ответ при неудачном обновлении",
+     *     @OA\JsonContent(
+     *       @OA\Property(
+     *          property="code",
+     *          type="string",
+     *          example="401"
+     *        ),
+     *        @OA\Property(
+     *          property="message",
+     *          type="string",
+     *          example="Missing JWT refresh token."
      *        ),
      *     )
      * )

@@ -1,0 +1,14 @@
+{% extends 'email-base.html.twig' %}
+
+{% block title %}
+    Уведомление об окончании срока аренды.
+{% endblock %}
+
+{% block body %}
+    <h1>
+        Уважаемый клиент! У вас есть курсы, срок аренды которых подходит к концу:
+    </h1>
+    {% for t in transactions %}
+        <p style="margin-bottom: 3px">Курс "{{ t.course.name }}" действует до {{ t.expiredAt|date('d.m.Y H:i') }}.</p>
+    {% endfor %}
+{% endblock %}

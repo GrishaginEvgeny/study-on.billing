@@ -5,53 +5,56 @@ namespace App\DataFixtures;
 use App\Entity\Course;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Bundle\FixturesBundle\FixtureGroupInterface;
+use Doctrine\Common\DataFixtures\OrderedFixtureInterface;
 use Doctrine\Persistence\ObjectManager;
 
-class CourseFixtures extends Fixture implements FixtureGroupInterface
+class CourseFixtures extends Fixture implements OrderedFixtureInterface
 {
 
-    public static function getGroups(): array
-     {
-         return ['group1'];
-     }
+    public function getOrder(): int
+    {
+        return 1;
+    }
 
     public function load(ObjectManager $manager): void
     {
+
         $courses = [
             'pythonDeveloper' => new Course(),
             'layoutDesigner' => new Course(),
             'webDeveloper' => new Course(),
-            'testForMoney1' => new Course(),
-            'testForMoney2' => new Course(),
+            'desktopDeveloper' => new Course(),
+            'chessPlayer' => new Course(),
         ];
 
         $courses['pythonDeveloper']
-            ->setCharacterCode('pydev')
-            ->setType(2)
+            ->setName('Python-разработчик')
+            ->setType(Course::RENT_TYPE)
             ->setCost(99.99);
 
         $courses['layoutDesigner']
-            ->setCharacterCode('layoutdesigner')
-            ->setType(1);
+            ->setName('Верстальщик')
+            ->setType(Course::FREE_TYPE);
 
 
         $courses['webDeveloper']
-            ->setCharacterCode('webdev')
-            ->setType(3)
+            ->setName('Веб-разработчик')
+            ->setType(Course::BUY_TYPE)
             ->setCost(199.99);
 
-        $courses['testForMoney1']
-            ->setCharacterCode('forMoney1')
-            ->setType(3)
+        $courses['desktopDeveloper']
+            ->setName('Разработчик десктопных приложений')
+            ->setType(Course::BUY_TYPE)
             ->setCost(1990.99);
 
-        $courses['testForMoney2']
-            ->setCharacterCode('forMoney2')
-            ->setType(2)
+        $courses['chessPlayer']
+            ->setName('Обучение шахматам')
+            ->setType(Course::RENT_TYPE)
             ->setCost(1100.99);
 
 
-        foreach ($courses as $course) {
+        foreach ($courses as $key => $course) {
+            $course->setCharacterCode($key);
             $manager->persist($course);
         }
 

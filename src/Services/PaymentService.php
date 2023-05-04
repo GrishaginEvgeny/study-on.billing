@@ -10,7 +10,6 @@ use Doctrine\ORM\EntityManagerInterface;
 
 class PaymentService
 {
-//    Deposit is 1, Payment is 0
 
     private EntityManagerInterface $entityManager;
 
@@ -37,9 +36,9 @@ class PaymentService
             $this->entityManager->getConnection()->beginTransaction();
             $transaction = new Transaction();
             $transaction
-                ->setType(1)
-                ->setValue($amount)
-                ->setDate(new \DateTime('now'))
+                ->setType(Transaction::DEPOSIT_TYPE)
+                ->setAmount($amount)
+                ->setCreatedAt(new \DateTime('now'))
                 ->setTransactionUser($user);
             $user->setBalance($user->getBalance() + $amount);
             $this->transactionRepository->add($transaction, true);
@@ -61,14 +60,14 @@ class PaymentService
             $this->entityManager->getConnection()->beginTransaction();
             $transaction = new Transaction();
             $transaction
-                ->setType(0)
-                ->setValue($course->getCost())
-                ->setDate(new \DateTime('now'))
+                ->setType(Transaction::PAYMENT_TYPE)
+                ->setAmount($course->getCost())
+                ->setCreatedAt(new \DateTime('now'))
                 ->setTransactionUser($user)
                 ->setCourse($course);
             $user->setBalance($user->getBalance() - $course->getCost());
-            if ($course->getStringedType() === 'rent') {
-                $transaction->setValidTo((new \DateTime('now'))
+            if ($course->getTypeCode() === 'rent') {
+                $transaction->setExpiredAt((new \DateTime('now'))
                     ->add(\DateInterval::createFromDateString('1 week')));
             }
             $this->transactionRepository->add($transaction, true);

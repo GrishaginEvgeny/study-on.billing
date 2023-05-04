@@ -29,7 +29,6 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 /**
  * @Route("/api/v1")
  */
-
 class UserApiController extends AbstractController
 {
 
@@ -40,10 +39,11 @@ class UserApiController extends AbstractController
     private JWTTokenManagerInterface $JWTTokenManager;
 
     public function __construct(
-        ValidatorInterface $validator,
+        ValidatorInterface          $validator,
         UserPasswordHasherInterface $hasher,
-        JWTTokenManagerInterface $JWTTokenManager
-    ) {
+        JWTTokenManagerInterface    $JWTTokenManager
+    )
+    {
         $this->validator = $validator;
         $this->hasher = $hasher;
         $this->JWTTokenManager = $JWTTokenManager;
@@ -57,7 +57,7 @@ class UserApiController extends AbstractController
      *     path="/api/v1/auth",
      *     summary="Аутентификация пользователя",
      *     description="Запрос на аутентификацию пользователя, обрабатываемый бандлом.
-      Эта функция возвращает JWT-токен при успешной авторизации или ошибки при неудачной."
+    Эта функция возвращает JWT-токен при успешной авторизации или ошибки при неудачной."
      * )
      * @OA\RequestBody(
      *     required=true,
@@ -208,34 +208,35 @@ class UserApiController extends AbstractController
      * @throws \Doctrine\DBAL\Exception
      */
     public function register(
-        Request $request,
-        UserRepository $userRepository,
+        Request                        $request,
+        UserRepository                 $userRepository,
         RefreshTokenGeneratorInterface $refreshTokenGenerator,
-        RefreshTokenManagerInterface $refreshTokenManager,
-        PaymentService $paymentService): JsonResponse {
+        RefreshTokenManagerInterface   $refreshTokenManager,
+        PaymentService                 $paymentService): JsonResponse
+    {
         $serializer = SerializerBuilder::create()->build();
         $userDto = $serializer->deserialize($request->getContent(), UserDTO::class, 'json');
-        $errors = $this->validator->validate($userDto);
-        if(count($errors) > 0) {
-            $jsonedError = [];
-            foreach ($errors as $error){
-                $jsonedError[$error->getPropertyPath()] = $error->getMessage();
+        $errorsFromDto = $this->validator->validate($userDto);
+        if (count($errorsFromDto) > 0) {
+            $errors = [];
+            foreach ($errorsFromDto as $error) {
+                $errors[$error->getPropertyPath()] = $error->getMessage();
             }
             return new JsonResponse([
                 'code' => Response::HTTP_BAD_REQUEST,
                 'error_description' => 'Ошибка регистрации',
-                'errors' => $jsonedError,
-            ],Response::HTTP_BAD_REQUEST);
+                'errors' => $errors,
+            ], Response::HTTP_BAD_REQUEST);
         }
 
-        if($userRepository->findOneBy(['email' => $userDto->username])){
+        if ($userRepository->findOneBy(['email' => $userDto->username])) {
             return new JsonResponse([
                 'code' => Response::HTTP_BAD_REQUEST,
                 'error_description' => 'Ошибка регистрации',
                 'errors' => [
                     "username" => 'Пользователь с таким E-mail уже зарегистрирован.'
                 ],
-            ],Response::HTTP_BAD_REQUEST);
+            ], Response::HTTP_BAD_REQUEST);
         }
 
         $newUser = User::fromDTO($userDto);
@@ -263,7 +264,7 @@ class UserApiController extends AbstractController
      *     path="/api/v1/users/current",
      *     summary="Получение актуального авторизированного пользоватея",
      *     description="Запрос на получение актуального авторизированного пользователя. При выполнении запроса будучи неавторизированным будет возвращена ошибка.
-     При выполнении запроса при авторизированном пользователе будет возвращена информация о пользователе."
+    При выполнении запроса при авторизированном пользователе будет возвращена информация о пользователе."
      * )
      * @OA\Response(
      *     response="200",
@@ -325,7 +326,7 @@ class UserApiController extends AbstractController
      */
     public function currentUser(): JsonResponse
     {
-        if(!$this->getUser()){
+        if (!$this->getUser()) {
             return new JsonResponse([
                 'code' => Response::HTTP_UNAUTHORIZED,
                 "message" => "JWT Token not found"
@@ -420,6 +421,7 @@ class UserApiController extends AbstractController
      *        ),
      *     )
      * )
+     * @Security(name="Bearer")
      * @OA\Tag(name="UserApi")
      */
     public function refresh()

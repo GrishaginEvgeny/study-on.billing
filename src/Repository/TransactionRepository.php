@@ -51,32 +51,33 @@ class TransactionRepository extends ServiceEntityRepository
      * @return int|mixed|string
      */
     public function getTransactionsByFilters(
-        ?int $type = null,
+        ?int    $type = null,
         ?string $characterCode = null,
-        ?bool $skipExpired = null,
-        User $user) {
+        ?bool   $skipExpired = null,
+        User    $user)
+    {
         $query = $this->getEntityManager()->createQueryBuilder()
             ->select('t')
             ->from('App\Entity\Transaction', 't')
-            ->leftJoin('t.Course', 'c', Join::WITH)
+            ->leftJoin('t.course', 'c', Join::WITH)
             ->andWhere('t.transactionUser = :user')
             ->setParameter('user', $user);
 
-        if(!is_null($type)) {
+        if (!is_null($type)) {
             $query->andWhere('t.type = :type')
                 ->setParameter('type', $type);
         }
 
-        if($characterCode) {
-            $query->andWhere('c.CharacterCode = :char_code')
+        if ($characterCode) {
+            $query->andWhere('c.characterCode = :char_code')
                 ->setParameter('char_code', $characterCode);
         }
 
-        if($skipExpired) {
-            $query->andWhere('t.ValidTo > :now_date')
+        if ($skipExpired) {
+            $query->andWhere('t.expiredAt > :now_date')
                 ->setParameter('now_date', new \DateTime('now'));
-            if(!$characterCode) {
-                $query->orWhere('t.ValidTo is NULL');
+            if (!$characterCode) {
+                $query->orWhere('t.expiredAt is NULL');
             }
         }
 
@@ -86,17 +87,51 @@ class TransactionRepository extends ServiceEntityRepository
     /**
      * @throws \Doctrine\ORM\NonUniqueResultException
      */
-    public function getTransactionOnTypeRentWithMaxDate(Course $course, User $user) {
+    public function getTransactionOnTypeRentWithMaxDate(Course $course, User $user)
+    {
         $query = $this->getEntityManager()->createQueryBuilder()
             ->select('t')
             ->from('App\Entity\Transaction', 't')
-            ->orderBy('t.ValidTo', 'DESC')
+            ->orderBy('t.expiredAt', 'DESC')
             ->setMaxResults(1)
             ->andWhere('t.transactionUser = :user')
             ->setParameter('user', $user)
-            ->andWhere('t.Course = :course')
+            ->andWhere('t.course = :course')
             ->setParameter('course', $course);
         return $query->getQuery()->getOneOrNullResult();
+    }
+
+    public function getRentTransactionsExpiresInOneDayOnUser(User $user)
+    {
+        $query = $this->getEntityManager()->createQueryBuilder()
+            ->select('t')
+            ->from('App\Entity\Transaction', 't')
+            ->andWhere('t.transactionUser = :user')
+            ->setParameter('user', $user)
+            ->andWhere('t.expiredAt < :plus_one_day_date')
+            ->setParameter('plus_one_day_date', new \DateTime('+1 day'));
+        return $query->getQuery()->getResult();
+    }
+
+    public function getReportAboutCourses()
+    {
+        $query = $this->getEntityManager()->createQuery('SELECT 
+                     c.name AS name,
+                     c.type AS type,
+                     count(t.id) AS count,
+                     sum(t.amount) AS totalSum
+              FROM App\Entity\Transaction t,
+                     App\Entity\Course c
+              WHERE (c.type = :buy OR c.type = :rent)
+                  AND t.course = c.id
+                  AND t.createdAt BETWEEN :start AND :end
+              GROUP BY c.id, c.type')
+            ->setParameter('start', new \DateTime('-1 month'))
+            ->setParameter('end', new \DateTime('now'))
+            ->setParameter('buy', Course::BUY_TYPE)
+            ->setParameter('rent', Course::RENT_TYPE);
+
+        return $query->getResult();
     }
 
 //    /**

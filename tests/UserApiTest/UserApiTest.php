@@ -6,9 +6,10 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 class UserApiTest extends \App\Tests\AbstractTest
 {
     private array $usersCredentials = [
-        ['username' =>'usualuser@study.com', 'password'=> 'user'],
-        ['username' =>'admin@study.com', 'password'=> 'admin']
-        ];
+        ['username' => 'usualuser@study.com', 'password' => 'user'],
+        ['username' => 'admin@study.com', 'password' => 'admin']
+    ];
+
     protected function getFixtures(): array
     {
         $paymentService = $this->getContainer()->get(\App\Services\PaymentService::class);
@@ -20,148 +21,157 @@ class UserApiTest extends \App\Tests\AbstractTest
     public function testInvalidCredentialsAuth(): void
     {
         $client = $this->getClient();
-        $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],  json_encode(['username'=> '123', 'password' => '123']));
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-        $this->assertSame("Invalid credentials.", $arrayedContent['message']);
+        $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode(['username' => '123', 'password' => '123']));
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $this->assertSame("Invalid credentials.", $content['message']);
         $this->assertResponseCode(401);
     }
 
     public function testValidCredentialsAuth(): void
     {
         $client = $this->getClient();
-        foreach ($this->usersCredentials as $user){
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
-            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
+        foreach ($this->usersCredentials as $user) {
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
+            $content = json_decode($client->getResponse()->getContent(), true);
             $this->assertResponseCode(200);
-            $this->assertArrayHasKey('token', $arrayedContent);
+            $this->assertArrayHasKey('token', $content);
         }
     }
 
-    public function testRegisterInvalidEmail():void{
+    public function testRegisterInvalidEmail(): void
+    {
         $client = $this->getClient();
-        $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['username'=> '123', 'password' => 'ASDVsas123.']));
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-        $arrayedContent['errors'] = (array)$arrayedContent['errors'];
-        $this->assertSame("Ошибка регистрации", $arrayedContent['error_description']);
-        $this->assertNotEquals(0, count($arrayedContent['errors']));
-        $this->assertArrayHasKey('username', $arrayedContent['errors']);
-        $this->assertSame("Поле e-mail содержит некорректные данные.", $arrayedContent['errors']['username']);
+        $client->request('POST', '/api/v1/register', [], [], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['username' => '123', 'password' => 'ASDVsas123.']));
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $content['errors'] = (array)$content['errors'];
+        $this->assertSame("Ошибка регистрации", $content['error_description']);
+        $this->assertNotCount(0, $content['errors']);
+        $this->assertArrayHasKey('username', $content['errors']);
+        $this->assertSame("Поле e-mail содержит некорректные данные.", $content['errors']['username']);
     }
 
-    public function testRegisterBlankEmail():void{
+    public function testRegisterBlankEmail(): void
+    {
         $client = $this->getClient();
-        $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['username'=> '', 'password' => 'ASDVsas123.']));
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-        $arrayedContent['errors'] = (array)$arrayedContent['errors'];
-        $this->assertSame("Ошибка регистрации", $arrayedContent['error_description']);
-        $this->assertNotEquals(0, count($arrayedContent['errors']));
-        $this->assertArrayHasKey('username', $arrayedContent['errors']);
-        $this->assertSame("Поле e-mail не может быт пустым.", $arrayedContent['errors']['username']);
+        $client->request('POST', '/api/v1/register', [], [], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['username' => '', 'password' => 'ASDVsas123.']));
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $content['errors'] = (array)$content['errors'];
+        $this->assertSame("Ошибка регистрации", $content['error_description']);
+        $this->assertNotCount(0, $content['errors']);
+        $this->assertArrayHasKey('username', $content['errors']);
+        $this->assertSame("Поле e-mail не может быт пустым.", $content['errors']['username']);
     }
 
-    public function testRegisterInvalidPassword():void{
+    public function testRegisterInvalidPassword(): void
+    {
         $client = $this->getClient();
-        $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['username'=> 'test@test.test', 'password' => 'dasdadadsa']));
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-        $arrayedContent['errors'] = (array)$arrayedContent['errors'];
-        $this->assertSame("Ошибка регистрации", $arrayedContent['error_description']);
-        $this->assertNotEquals(0, count($arrayedContent['errors']));
-        $this->assertArrayHasKey('password', $arrayedContent['errors']);
+        $client->request('POST', '/api/v1/register', [], [], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['username' => 'test@test.test', 'password' => 'dasdadadsa']));
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $content['errors'] = (array)$content['errors'];
+        $this->assertSame("Ошибка регистрации", $content['error_description']);
+        $this->assertNotCount(0, $content['errors']);
+        $this->assertArrayHasKey('password', $content['errors']);
         $this->assertSame(
             "Пароль должен содержать как один из спец. символов (.!@#$%^&*), прописную и строчные буквы латинского алфавита и цифру.",
-            $arrayedContent['errors']['password']);
+            $content['errors']['password']);
     }
 
-    public function testRegisterWithPasswordWhichHaveLengthLessThenConstraint():void{
+    public function testRegisterWithPasswordWhichHaveLengthLessThenConstraint(): void
+    {
         $client = $this->getClient();
-        $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['username'=> 'test@test.test', 'password' => 'Aa1.']));
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-        $arrayedContent['errors'] = (array)$arrayedContent['errors'];
-        $this->assertSame("Ошибка регистрации", $arrayedContent['error_description']);
-        $this->assertNotEquals(0, count($arrayedContent['errors']));
-        $this->assertArrayHasKey('password', $arrayedContent['errors']);
+        $client->request('POST', '/api/v1/register', [], [], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['username' => 'test@test.test', 'password' => 'Aa1.']));
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $content['errors'] = (array)$content['errors'];
+        $this->assertSame("Ошибка регистрации", $content['error_description']);
+        $this->assertNotCount(0, $content['errors']);
+        $this->assertArrayHasKey('password', $content['errors']);
         $this->assertSame(
             "Пароль должен содержать минимум 6 символов.",
-            $arrayedContent['errors']['password']);
+            $content['errors']['password']);
     }
 
 
-    public function testSuccessfullyRegister(){
+    public function testSuccessfullyRegister()
+    {
         $client = $this->getClient();
-        $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['username'=> 'usernotindb@test.test', 'password' => 'Aa111Bb.']));
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
+        $client->request('POST', '/api/v1/register', [], [], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['username' => 'usernotindb@test.test', 'password' => 'Aa111Bb.']));
+        $content = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseCode(201);
-        $this->assertArrayHasKey('token', $arrayedContent);
-        $this->assertArrayHasKey('refresh_token', $arrayedContent);
+        $this->assertArrayHasKey('token', $content);
+        $this->assertArrayHasKey('refresh_token', $content);
     }
 
-    public function testGetUserWithUnAuth(){
+    public function testGetUserWithUnAuth()
+    {
         $client = $this->getClient();
         $client->request('GET', '/api/v1/users/current');
         $this->assertResponseCode(401);
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-        $this->assertArrayHasKey('message', $arrayedContent);
-        $this->assertSame("JWT Token not found", $arrayedContent['message']);
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('message', $content);
+        $this->assertSame("JWT Token not found", $content['message']);
     }
 
-    public function testGetUserWithAuth(){
+    public function testGetUserWithAuth()
+    {
         $client = $this->getClient();
-        foreach ($this->usersCredentials as $user){
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
-            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
+        foreach ($this->usersCredentials as $user) {
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
+            $content = json_decode($client->getResponse()->getContent(), true);
             $this->assertResponseCode(200);
-            $this->assertArrayHasKey('token', $arrayedContent);
-            $client->request('GET', '/api/v1/users/current',[],[],['HTTP_AUTHORIZATION' => 'Bearer '. $arrayedContent['token']]);
+            $this->assertArrayHasKey('token', $content);
+            $client->request('GET', '/api/v1/users/current', [], [], ['HTTP_AUTHORIZATION' => 'Bearer ' . $content['token']]);
             $this->assertResponseCode(200);
-            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-            $this->assertSame($user['username'], $arrayedContent['username']);
+            $content = json_decode($client->getResponse()->getContent(), true);
+            $this->assertSame($user['username'], $content['username']);
             $userFromRepository = static::getContainer()->get(UserRepository::class)
-                ->findOneBy(['email' => $arrayedContent['username']]);
-            $this->assertSame($userFromRepository->getUserIdentifier(), $arrayedContent['username']);
-            $this->assertSame($userFromRepository->getRoles(), $arrayedContent['roles']);
-            $this->assertEquals($userFromRepository->getBalance(), $arrayedContent['balance']);
+                ->findOneBy(['email' => $content['username']]);
+            $this->assertSame($userFromRepository->getUserIdentifier(), $content['username']);
+            $this->assertSame($userFromRepository->getRoles(), $content['roles']);
+            $this->assertEquals($userFromRepository->getBalance(), $content['balance']);
         }
     }
 
-    public function testResfreshSuccessfully(){
-            $client = $this->getClient();
-            $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> 'usernotindb@test.test', 'password' => 'Aa111Bb.']));
-            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-            $this->assertResponseCode(201);
-            $this->assertArrayHasKey('token', $arrayedContent);
-            $this->assertArrayHasKey('refresh_token', $arrayedContent);
-            $client->request('POST', '/api/v1/token/refresh',[],[],
-                ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['refresh_token'=> $arrayedContent['refresh_token']]));
-            $this->assertResponseCode(200);
-            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContent);
-            $this->assertArrayHasKey('refresh_token', $arrayedContent);
+    public function testResfreshSuccessfully()
+    {
+        $client = $this->getClient();
+        $client->request('POST', '/api/v1/register', [], [], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['username' => 'usernotindb@test.test', 'password' => 'Aa111Bb.']));
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $this->assertResponseCode(201);
+        $this->assertArrayHasKey('token', $content);
+        $this->assertArrayHasKey('refresh_token', $content);
+        $client->request('POST', '/api/v1/token/refresh', [], [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['refresh_token' => $content['refresh_token']]));
+        $this->assertResponseCode(200);
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('token', $content);
+        $this->assertArrayHasKey('refresh_token', $content);
     }
 
-    public function testResfreshWithWrongToken(){
+    public function testResfreshWithWrongToken()
+    {
         $client = $this->getClient();
-        $client->request('POST', '/api/v1/register',[],[], ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['username'=> 'usernotindb@test.test', 'password' => 'Aa111Bb.']));
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
+        $client->request('POST', '/api/v1/register', [], [], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['username' => 'usernotindb@test.test', 'password' => 'Aa111Bb.']));
+        $content = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseCode(201);
-        $this->assertArrayHasKey('token', $arrayedContent);
-        $this->assertArrayHasKey('refresh_token', $arrayedContent);
-        $client->request('POST', '/api/v1/token/refresh',[],[],
+        $this->assertArrayHasKey('token', $content);
+        $this->assertArrayHasKey('refresh_token', $content);
+        $client->request('POST', '/api/v1/token/refresh', [], [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['refresh_token'=> '123123']));
+            json_encode(['refresh_token' => '123123']));
         $this->assertResponseCode(401);
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-        $this->assertArrayHasKey('code', $arrayedContent);
-        $this->assertArrayHasKey('message', $arrayedContent);
-        $this->assertEquals('JWT Refresh Token Not Found', $arrayedContent['message']);
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('code', $content);
+        $this->assertArrayHasKey('message', $content);
+        $this->assertEquals('JWT Refresh Token Not Found', $content['message']);
     }
 }

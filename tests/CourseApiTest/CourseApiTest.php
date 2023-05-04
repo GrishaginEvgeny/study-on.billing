@@ -6,8 +6,8 @@ class CourseApiTest extends \App\Tests\AbstractTest
 {
 
     private array $usersCredentials = [
-        ['username' =>'usualuser@study.com', 'password'=> 'user'],
-        ['username' =>'admin@study.com', 'password'=> 'admin']
+        ['username' => 'usualuser@study.com', 'password' => 'user'],
+        ['username' => 'admin@study.com', 'password' => 'admin']
     ];
 
     protected function getFixtures(): array
@@ -18,48 +18,50 @@ class CourseApiTest extends \App\Tests\AbstractTest
             new \App\DataFixtures\CourseFixtures()];
     }
 
-    public function testGetCourses () {
+    public function testGetCourses()
+    {
         $client = $this->getClient();
-        $client->request('GET', '/api/v1/courses',[],[], ['CONTENT_TYPE' => 'application/json']);
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
+        $client->request('GET', '/api/v1/courses', [], [], ['CONTENT_TYPE' => 'application/json']);
+        $content = json_decode($client->getResponse()->getContent(), true);
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $courses = $courseRepository->findAll();
-        $arrayedCoursesFromRepository = [];
-        foreach ($courses as $course){
-            $arrayedCoursesFromRepository[] = [
+        $coursesFromRepository = [];
+        foreach ($courses as $course) {
+            $coursesFromRepository[] = [
                 'character_code' => $course->getCharacterCode(),
-                'type' => $course->getStringedType(),
+                'type' => $course->getTypeCode(),
                 'price' => $course->getCost()
             ];
         }
-        $this->assertSame($arrayedContent, $arrayedCoursesFromRepository);
+        $this->assertSame($content, $coursesFromRepository);
     }
 
-    public function testGetCourse () {
+    public function testGetCourse()
+    {
         $client = $this->getClient();
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $courses = $courseRepository->findAll();
-        foreach ($courses as $course){
+        foreach ($courses as $course) {
             $client->request('GET', "/api/v1/courses/{$course->getCharacterCode()}",
-                [],[], ['CONTENT_TYPE' => 'application/json']);
-            $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-            $arrayedCourseFromRepository = [
+                [], [], ['CONTENT_TYPE' => 'application/json']);
+            $content = json_decode($client->getResponse()->getContent(), true);
+            $courseFromRepository = [
                 'character_code' => $course->getCharacterCode(),
-                'type' => $course->getStringedType(),
+                'type' => $course->getTypeCode(),
                 'price' => $course->getCost()
             ];
-            $this->assertSame($arrayedContent, $arrayedCourseFromRepository);
+            $this->assertSame($content, $courseFromRepository);
         }
     }
 
-    public function testGetCourseWithWrongCode ()
+    public function testGetCourseWithWrongCode()
     {
         $client = $this->getClient();
         $client->request('GET', "/api/v1/courses/wrongcourse123",
             [], [], ['CONTENT_TYPE' => 'application/json']);
-        $arrayedContent = json_decode($client->getResponse()->getContent(), true);
+        $content = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseNotFound();
-        $this->assertSame('Курс с таким символьным кодом не найден.', $arrayedContent['message']);
+        $this->assertSame('Курс с таким символьным кодом не найден.', $content['message']);
     }
 
     public function testPayForCourseSuccessfully()
@@ -68,20 +70,20 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $courses = $courseRepository->findLessThenByCost(500);
         foreach ($this->usersCredentials as $user) {
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
             $this->assertResponseCode(200);
-            $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContentUser);
-            $token = $arrayedContentUser['token'];
+            $userContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $userContent);
+            $token = $userContent['token'];
             foreach ($courses as $course) {
-                if($course->getStringedType() === "rent" || $course->getStringedType() === "buy"){
+                if ($course->getTypeCode() === "rent" || $course->getTypeCode() === "buy") {
                     $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
                         [], [], ['CONTENT_TYPE' => 'application/json',
-                            'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                            'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
                     $this->assertResponseCode(201);
-                    $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-                    $this->assertEquals(true, $arrayedContentCourse["success"]);
+                    $courseContent = json_decode($client->getResponse()->getContent(), true);
+                    $this->assertEquals(true, $courseContent["success"]);
                 }
             }
         }
@@ -94,16 +96,16 @@ class CourseApiTest extends \App\Tests\AbstractTest
             $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
                 json_encode(['username' => $user['username'], 'password' => $user['password']]));
             $this->assertResponseCode(200);
-            $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContentUser);
-            $token = $arrayedContentUser['token'];
+            $userContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $userContent);
+            $token = $userContent['token'];
             $client->request('POST', "/api/v1/courses/nonexisted/pay",
                 [], [], ['CONTENT_TYPE' => 'application/json',
                     'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(404);
-            $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(404, $arrayedContentCourse["code"]);
-            $this->assertEquals("Курс с таким символьным кодом не найден.", $arrayedContentCourse["message"]);
+            $courseContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertEquals(404, $courseContent["code"]);
+            $this->assertEquals("Курс с таким символьным кодом не найден.", $courseContent["message"]);
         }
     }
 
@@ -113,14 +115,14 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $courses = $courseRepository->findAll();
         foreach ($courses as $course) {
-                if($course->getStringedType() === "rent" || $course->getStringedType() === "buy"){
-                    $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
-                        [], [], ['CONTENT_TYPE' => 'application/json']);
-                    $this->assertResponseCode(401);
-                    $arrayedContent = json_decode($client->getResponse()->getContent(), true);
-                    $this->assertEquals(401, $arrayedContent["code"]);
-                    $this->assertEquals("Вы не авторизованы.", $arrayedContent["message"]);
-                }
+            if ($course->getTypeCode() === "rent" || $course->getTypeCode() === "buy") {
+                $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
+                    [], [], ['CONTENT_TYPE' => 'application/json']);
+                $this->assertResponseCode(401);
+                $content = json_decode($client->getResponse()->getContent(), true);
+                $this->assertEquals(401, $content["code"]);
+                $this->assertEquals("Вы не авторизованы.", $content["message"]);
+            }
         }
     }
 
@@ -130,21 +132,21 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $courses = $courseRepository->findAll();
         foreach ($this->usersCredentials as $user) {
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
             $this->assertResponseCode(200);
-            $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContentUser);
-            $token = $arrayedContentUser['token'];
+            $userContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $userContent);
+            $token = $userContent['token'];
             foreach ($courses as $course) {
-                if($course->getStringedType() === "free"){
+                if ($course->getTypeCode() === "free") {
                     $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
                         [], [], ['CONTENT_TYPE' => 'application/json',
-                            'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                            'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
                     $this->assertResponseCode(406);
-                    $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-                    $this->assertEquals(406, $arrayedContentCourse["code"]);
-                    $this->assertEquals("Этот курс бесплатен и не требует покупки.", $arrayedContentCourse["message"]);
+                    $courseContent = json_decode($client->getResponse()->getContent(), true);
+                    $this->assertEquals(406, $courseContent["code"]);
+                    $this->assertEquals("Этот курс бесплатен и не требует покупки.", $courseContent["message"]);
                 }
             }
         }
@@ -153,23 +155,23 @@ class CourseApiTest extends \App\Tests\AbstractTest
     public function testPayForCourseWithNotEnoughMoney()
     {
         $client = $this->getClient();
-        $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['username'=> 'usualuser@study.com', 'password' => 'user']));
+        $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['username' => 'usualuser@study.com', 'password' => 'user']));
         $this->assertResponseCode(200);
-        $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-        $this->assertArrayHasKey('token', $arrayedContentUser);
-        $token = $arrayedContentUser['token'];
+        $userContent = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('token', $userContent);
+        $token = $userContent['token'];
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $courses = $courseRepository->findGreaterThenByCost(1000);
         foreach ($courses as $course) {
             $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
-                [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(406);
-            $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(406, $arrayedContentCourse["code"]);
-            $textForResponse = $course->getStringedType() === 'rent' ? 'аренды' : 'покупки';
+            $courseContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertEquals(406, $courseContent["code"]);
+            $textForResponse = $course->getTypeCode() === 'rent' ? 'аренды' : 'покупки';
             $this->assertEquals("У вас не достаточно средств на счёте для "
-                ."{$textForResponse} этого курса.", $arrayedContentCourse["message"]);
+                . "{$textForResponse} этого курса.", $courseContent["message"]);
         }
     }
 
@@ -180,32 +182,32 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $courses = $courseRepository->findLessThenByCost(500);
         foreach ($this->usersCredentials as $user) {
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
             $this->assertResponseCode(200);
-            $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContentUser);
-            $token = $arrayedContentUser['token'];
+            $userContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $userContent);
+            $token = $userContent['token'];
             foreach ($courses as $course) {
-                if($course->getStringedType() === "rent" || $course->getStringedType() === "buy"){
+                if ($course->getTypeCode() === "rent" || $course->getTypeCode() === "buy") {
                     $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
                         [], [], ['CONTENT_TYPE' => 'application/json',
-                            'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                            'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
                     $this->assertResponseCode(201);
-                    $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-                    $this->assertEquals(true, $arrayedContentCourse["success"]);
+                    $courseContent = json_decode($client->getResponse()->getContent(), true);
+                    $this->assertEquals(true, $courseContent["success"]);
 
                     $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
                         [], [], ['CONTENT_TYPE' => 'application/json',
-                            'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                            'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
 
                     $this->assertResponseCode(406);
-                    $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-                    $this->assertEquals(406, $arrayedContentCourse["code"]);
-                    $textForResponse = $course->getStringedType() === 'rent' ?
+                    $courseContent = json_decode($client->getResponse()->getContent(), true);
+                    $this->assertEquals(406, $courseContent["code"]);
+                    $textForResponse = $course->getTypeCode() === 'rent' ?
                         'Этот курс уже арендован и длительность аренды ещё не истекла.' :
                         'Этот курс уже куплен.';
-                    $this->assertEquals($textForResponse, $arrayedContentCourse["message"]);
+                    $this->assertEquals($textForResponse, $courseContent["message"]);
                 }
             }
         }
@@ -217,24 +219,24 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $course = $courseRepository->findOneBy(['type' => 3, 'cost' => 199.99]);
         foreach ($this->usersCredentials as $user) {
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
             $this->assertResponseCode(200);
-            $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContentUser);
-            $token = $arrayedContentUser['token'];
+            $userContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $userContent);
+            $token = $userContent['token'];
             $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
                 [], [], ['CONTENT_TYPE' => 'application/json',
-                    'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(201);
-            $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(true, $arrayedContentCourse["success"]);
-            $client->request('GET', '/api/v1/transactions',[],[],
-                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+            $courseContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertEquals(true, $courseContent["success"]);
+            $client->request('GET', '/api/v1/transactions', [], [],
+                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseOk();
-            $arrayedContentTransaction = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(2, count($arrayedContentTransaction));
-            foreach ($arrayedContentTransaction as $transaction) {
+            $transactionContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertEquals(2, count($transactionContent));
+            foreach ($transactionContent as $transaction) {
                 $this->assertArrayHasKey('created_at', $transaction);
             }
 
@@ -247,36 +249,36 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $course = $courseRepository->findOneBy(['type' => 3, 'cost' => 199.99]);
         foreach ($this->usersCredentials as $user) {
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
             $this->assertResponseCode(200);
-            $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContentUser);
-            $token = $arrayedContentUser['token'];
+            $userContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $userContent);
+            $token = $userContent['token'];
             $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
                 [], [], ['CONTENT_TYPE' => 'application/json',
-                    'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(201);
-            $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(true, $arrayedContentCourse["success"]);
-            $client->request('GET', '/api/v1/transactions?type=deposit',[],[],
-                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+            $courseContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertEquals(true, $courseContent["success"]);
+            $client->request('GET', '/api/v1/transactions?type=deposit', [], [],
+                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseOk();
-            $arrayedContentTransaction = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(1, count($arrayedContentTransaction));
-            foreach ($arrayedContentTransaction as $transaction) {
+            $transactionContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertCount(1, $transactionContent);
+            foreach ($transactionContent as $transaction) {
                 $this->assertArrayHasKey('created_at', $transaction);
                 $this->assertArrayHasKey('type', $transaction);
                 $this->assertSame('deposit', $transaction['type']);
             }
 
-            $this->assertEquals(true, $arrayedContentCourse["success"]);
-            $client->request('GET', '/api/v1/transactions?type=payment',[],[],
-                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+            $this->assertEquals(true, $courseContent["success"]);
+            $client->request('GET', '/api/v1/transactions?type=payment', [], [],
+                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseOk();
-            $arrayedContentTransaction = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(1, count($arrayedContentTransaction));
-            foreach ($arrayedContentTransaction as $transaction) {
+            $transactionContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertCount(1, $transactionContent);
+            foreach ($transactionContent as $transaction) {
                 $this->assertArrayHasKey('created_at', $transaction);
                 $this->assertArrayHasKey('type', $transaction);
                 $this->assertSame('payment', $transaction['type']);
@@ -291,24 +293,24 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $course = $courseRepository->findOneBy(['type' => 3, 'cost' => 199.99]);
         foreach ($this->usersCredentials as $user) {
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
             $this->assertResponseCode(200);
-            $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContentUser);
-            $token = $arrayedContentUser['token'];
+            $userContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $userContent);
+            $token = $userContent['token'];
             $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
                 [], [], ['CONTENT_TYPE' => 'application/json',
-                    'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(201);
-            $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(true, $arrayedContentCourse["success"]);
-            $client->request('GET', "/api/v1/transactions?course_code={$course->getCharacterCode()}",[],[],
-                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+            $courseContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertEquals(true, $courseContent["success"]);
+            $client->request('GET', "/api/v1/transactions?course_code={$course->getCharacterCode()}", [], [],
+                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseOk();
-            $arrayedContentTransaction = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(1, count($arrayedContentTransaction));
-            foreach ($arrayedContentTransaction as $transaction) {
+            $transactionUser = json_decode($client->getResponse()->getContent(), true);
+            $this->assertCount(1, $transactionUser);
+            foreach ($transactionUser as $transaction) {
                 $this->assertArrayHasKey('created_at', $transaction);
                 $this->assertSame($course->getCharacterCode(), $transaction['course_code']);
             }
@@ -321,23 +323,23 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $course = $courseRepository->findOneBy(['type' => 3, 'cost' => 199.99]);
         foreach ($this->usersCredentials as $user) {
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
             $this->assertResponseCode(200);
-            $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContentUser);
-            $token = $arrayedContentUser['token'];
+            $userContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $userContent);
+            $token = $userContent['token'];
             $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
                 [], [], ['CONTENT_TYPE' => 'application/json',
-                    'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(201);
-            $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(true, $arrayedContentCourse["success"]);
-            $client->request('GET', "/api/v1/transactions?type=wrongtype",[],[],
-                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+            $courseContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertEquals(true, $courseContent["success"]);
+            $client->request('GET', "/api/v1/transactions?type=wrongtype", [], [],
+                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(400);
-            $arrayedContentTransaction = json_decode($client->getResponse()->getContent(), true);
-            $this->assertSame('Указанный тип не равен "deposit" или "payment".', $arrayedContentTransaction["message"]);
+            $transactionUser = json_decode($client->getResponse()->getContent(), true);
+            $this->assertSame('Указанный тип не равен "deposit" или "payment".', $transactionUser["message"]);
         }
     }
 
@@ -347,23 +349,23 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $course = $courseRepository->findOneBy(['type' => 3, 'cost' => 199.99]);
         foreach ($this->usersCredentials as $user) {
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
             $this->assertResponseCode(200);
-            $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContentUser);
-            $token = $arrayedContentUser['token'];
+            $userContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $userContent);
+            $token = $userContent['token'];
             $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
                 [], [], ['CONTENT_TYPE' => 'application/json',
-                    'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(201);
-            $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(true, $arrayedContentCourse["success"]);
-            $client->request('GET', "/api/v1/transactions?course_code=wrongtype",[],[],
-                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+            $courseContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertEquals(true, $courseContent["success"]);
+            $client->request('GET', "/api/v1/transactions?course_code=wrongtype", [], [],
+                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(404);
-            $arrayedContentTransaction = json_decode($client->getResponse()->getContent(), true);
-            $this->assertSame('Курс с таким символьным кодом не найден.', $arrayedContentTransaction["message"]);
+            $transactionContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertSame('Курс с таким символьным кодом не найден.', $transactionContent["message"]);
         }
     }
 
@@ -373,23 +375,23 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $course = $courseRepository->findOneBy(['type' => 3, 'cost' => 199.99]);
         foreach ($this->usersCredentials as $user) {
-            $client->request('POST', '/api/v1/auth',[],[], ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['username'=> $user['username'], 'password' => $user['password']]));
+            $client->request('POST', '/api/v1/auth', [], [], ['CONTENT_TYPE' => 'application/json'],
+                json_encode(['username' => $user['username'], 'password' => $user['password']]));
             $this->assertResponseCode(200);
-            $arrayedContentUser = json_decode($client->getResponse()->getContent(), true);
-            $this->assertArrayHasKey('token', $arrayedContentUser);
-            $token = $arrayedContentUser['token'];
+            $userContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertArrayHasKey('token', $userContent);
+            $token = $userContent['token'];
             $client->request('POST', "/api/v1/courses/{$course->getCharacterCode()}/pay",
                 [], [], ['CONTENT_TYPE' => 'application/json',
-                    'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+                    'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(201);
-            $arrayedContentCourse = json_decode($client->getResponse()->getContent(), true);
-            $this->assertEquals(true, $arrayedContentCourse["success"]);
-            $client->request('GET', "/api/v1/transactions?skip_expired=wrongflag",[],[],
-                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '. $token]);
+            $courseContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertEquals(true, $courseContent["success"]);
+            $client->request('GET', "/api/v1/transactions?skip_expired=wrongflag", [], [],
+                ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
             $this->assertResponseCode(400);
-            $arrayedContentTransaction = json_decode($client->getResponse()->getContent(), true);
-            $this->assertSame('Флаг не равен "true" или "false".', $arrayedContentTransaction["message"]);
+            $transactionContent = json_decode($client->getResponse()->getContent(), true);
+            $this->assertSame('Флаг не равен "true" или "false".', $transactionContent["message"]);
         }
     }
 

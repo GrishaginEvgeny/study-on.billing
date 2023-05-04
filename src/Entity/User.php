@@ -42,12 +42,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * @ORM\Column(type="float")
      */
-    private $Balance = 0.0;
+    private $balance = 0.0;
 
     /**
      * @ORM\OneToMany(targetEntity=Transaction::class, mappedBy="transactionUser")
      */
-    private $transactions;
+    private $C;
 
     public function __construct()
     {
@@ -155,12 +155,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getBalance(): ?float
     {
-        return $this->Balance;
+        return $this->balance;
     }
 
-    public function setBalance(float $Balance): self
+    public function setBalance(float $balance): self
     {
-        $this->Balance = $Balance;
+        $this->balance = $balance;
 
         return $this;
     }

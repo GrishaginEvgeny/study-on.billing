@@ -2,8 +2,6 @@
 
 namespace App\DTO;
 
-use JMS\Serializer\Annotation\Exclude;
-use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 use JMS\Serializer\Annotation as Serializer;
 

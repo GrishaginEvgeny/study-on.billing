@@ -10,6 +10,12 @@ use Doctrine\ORM\Mapping as ORM;
  */
 class Transaction
 {
+
+    public const PAYMENT_TYPE = 0;
+
+    public const DEPOSIT_TYPE = 1;
+
+
     /**
      * @ORM\Id
      * @ORM\GeneratedValue
@@ -26,7 +32,7 @@ class Transaction
     /**
      * @ORM\ManyToOne(targetEntity=Course::class, inversedBy="transactions")
      */
-    private $Course;
+    private $course;
 
     /**
      * @ORM\Column(type="smallint")
@@ -36,17 +42,17 @@ class Transaction
     /**
      * @ORM\Column(type="float")
      */
-    private $Value;
+    private $amount;
 
     /**
      * @ORM\Column(type="datetime")
      */
-    private $date;
+    private $createdAt;
 
     /**
      * @ORM\Column(type="datetime", nullable=true)
      */
-    private $ValidTo;
+    private $expiredAt;
 
     public function getId(): ?int
     {
@@ -67,12 +73,12 @@ class Transaction
 
     public function getCourse(): ?Course
     {
-        return $this->Course;
+        return $this->course;
     }
 
-    public function setCourse(?Course $Course): self
+    public function setCourse(?Course $course): self
     {
-        $this->Course = $Course;
+        $this->course = $course;
 
         return $this;
     }
@@ -89,39 +95,53 @@ class Transaction
         return $this;
     }
 
-    public function getValue(): ?float
+    public function getAmount(): ?float
     {
-        return $this->Value;
+        return $this->amount;
     }
 
-    public function setValue(float $Value): self
+    public function setAmount(float $amount): self
     {
-        $this->Value = $Value;
+        $this->amount = $amount;
 
         return $this;
     }
 
-    public function getDate(): ?\DateTimeInterface
+    public function getCreatedAt(): ?\DateTimeInterface
     {
-        return $this->date;
+        return $this->createdAt;
     }
 
-    public function setDate(\DateTimeInterface $date): self
+    public function setCreatedAt(\DateTimeInterface $createdAt): self
     {
-        $this->date = $date;
+        $this->createdAt = $createdAt;
 
         return $this;
     }
 
-    public function getValidTo(): ?\DateTimeInterface
+    public function getExpiredAt(): ?\DateTimeInterface
     {
-        return $this->ValidTo;
+        return $this->expiredAt;
     }
 
-    public function setValidTo(\DateTimeInterface $ValidTo): self
+    public function setExpiredAt(\DateTimeInterface $expiredAt): self
     {
-        $this->ValidTo = $ValidTo;
+        $this->expiredAt = $expiredAt;
 
         return $this;
+    }
+
+    public function getTypeCode(): string
+    {
+        $type = '';
+        switch ($this->getType()) {
+            case self::PAYMENT_TYPE:
+                $type = "payment";
+                break;
+            case self::DEPOSIT_TYPE:
+                $type = "deposit";
+                break;
+        }
+        return $type;
     }
 }

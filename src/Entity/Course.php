@@ -10,10 +10,21 @@ use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 
 /**
  * @ORM\Entity(repositoryClass=CourseRepository::class)
- * @UniqueEntity(fields={"CharacterCode"}, message="Курс с таким символьным кодом уже существует.")
+ * @UniqueEntity(fields={"characterCode"}, message="Курс с таким символьным кодом уже существует.")
  */
 class Course
 {
+    public const FREE_TYPE = 1;
+
+    public const RENT_TYPE = 2;
+
+    public const BUY_TYPE = 3;
+
+    public const TYPES_ARRAY = [
+        'free' => self::FREE_TYPE, 'rent' => self::RENT_TYPE, 'buy' => self::BUY_TYPE
+    ];
+
+
     /**
      * @ORM\Id
      * @ORM\GeneratedValue
@@ -24,7 +35,7 @@ class Course
     /**
      * @ORM\Column(type="string", length=255)
      */
-    private $CharacterCode;
+    private $characterCode;
 
     /**
      * @ORM\Column(type="smallint")
@@ -37,9 +48,14 @@ class Course
     private $cost;
 
     /**
-     * @ORM\OneToMany(targetEntity=Transaction::class, mappedBy="Course")
+     * @ORM\OneToMany(targetEntity=Transaction::class, mappedBy="course")
      */
     private $transactions;
+
+    /**
+     * @ORM\Column(type="string", length=255)
+     */
+    private $name;
 
     public function __construct()
     {
@@ -53,12 +69,12 @@ class Course
 
     public function getCharacterCode(): ?string
     {
-        return $this->CharacterCode;
+        return $this->characterCode;
     }
 
-    public function setCharacterCode(string $CharacterCode): self
+    public function setCharacterCode(string $characterCode): self
     {
-        $this->CharacterCode = $CharacterCode;
+        $this->characterCode = $characterCode;
 
         return $this;
     }
@@ -117,13 +133,32 @@ class Course
         return $this;
     }
 
-    public function getStringedType():string{
+    public function getTypeCode(): string
+    {
         $type = '';
         switch ($this->getType()) {
-            case 1: $type = "free"; break;
-            case 2: $type = "rent"; break;
-            case 3: $type = "buy"; break;
+            case self::FREE_TYPE:
+                $type = "free";
+                break;
+            case self::RENT_TYPE:
+                $type = "rent";
+                break;
+            case self::BUY_TYPE:
+                $type = "buy";
+                break;
         }
         return $type;
+    }
+
+    public function getName(): ?string
+    {
+        return $this->name;
+    }
+
+    public function setName(string $name): self
+    {
+        $this->name = $name;
+
+        return $this;
     }
 }

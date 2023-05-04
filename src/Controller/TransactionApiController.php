@@ -178,7 +178,7 @@ class TransactionApiController extends AbstractController
         $skipExpired = $request->query->get("skip_expired", null);
 
 
-        $course = $courseRepository->findOneBy(['CharacterCode' => $courseCode]);
+        $course = $courseRepository->findOneBy(['characterCode' => $courseCode]);
 
         if(!($type === 'deposit' || $type === 'payment') && !is_null($type)){
             return new JsonResponse([
@@ -188,7 +188,7 @@ class TransactionApiController extends AbstractController
         }
 
         if(!is_null($type)) {
-            $type = $type === "deposit" ? 1 : 0;
+            $type = $type === "deposit" ? Transaction::DEPOSIT_TYPE : Transaction::PAYMENT_TYPE;
         }
 
 
@@ -210,17 +210,17 @@ class TransactionApiController extends AbstractController
 
 
         $transactions = $transactionRepository->getTransactionsByFilters($type, $courseCode, $skipExpired, $user);
-        $responseArray = [];
+        $response = [];
         foreach ($transactions as $transaction){
-            $responseArray[] = [
+            $response[] = [
                 "id" => $transaction->getId(),
-                "created_at" => $transaction->getDate()->format(DATE_ATOM),
-                "type" => $transaction->getType() == 1 ? "deposit" : "payment",
+                "created_at" => $transaction->getCreatedAt()->format(DATE_ATOM),
+                "type" => $transaction->getTypeCode(),
                 "course_code" => $transaction->getCourse() ? $transaction->getCourse()->getCharacterCode() : null,
-                "amount" =>  $transaction->getValue(),
-                "expired_at" => $transaction->getValidTo() ? $transaction->getValidTo()->format(DATE_ATOM) : null
+                "amount" =>  $transaction->getAmount(),
+                "expired_at" => $transaction->getExpiredAt() ? $transaction->getExpiredAt()->format(DATE_ATOM) : null
             ];
         }
-        return new JsonResponse($responseArray);
+        return new JsonResponse($response);
     }
 }

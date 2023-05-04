@@ -6,20 +6,20 @@ use App\Entity\User;
 use App\Services\PaymentService;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Bundle\FixturesBundle\FixtureGroupInterface;
+use Doctrine\Common\DataFixtures\OrderedFixtureInterface;
 use Doctrine\Persistence\ObjectManager;
 use Gesdinet\JWTRefreshTokenBundle\Generator\RefreshTokenGeneratorInterface;
 use Gesdinet\JWTRefreshTokenBundle\Model\RefreshTokenManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 
-class UserFixtures extends Fixture implements FixtureGroupInterface
+class UserFixtures extends Fixture implements OrderedFixtureInterface
 {
 
-    public static function getGroups(): array
+    public function getOrder(): int
     {
-        return ['group2'];
+        return 0;
     }
-
     private UserPasswordHasherInterface $hasher;
     private PaymentService $paymentService;
 
@@ -29,7 +29,7 @@ class UserFixtures extends Fixture implements FixtureGroupInterface
      */
     public function __construct(
         UserPasswordHasherInterface $hasher,
-        PaymentService $paymentService)
+        PaymentService              $paymentService)
     {
         $this->hasher = $hasher;
         $this->paymentService = $paymentService;

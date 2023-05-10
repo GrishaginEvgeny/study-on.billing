@@ -27,11 +27,11 @@ class PaymentEndingNotificationCommand extends Command
     private MailerInterface $mailer;
 
     public function __construct(
-        Twig                  $twig,
+        Twig $twig,
         TransactionRepository $transactionRepository,
-        UserRepository        $userRepository,
-        MailerInterface       $mailer)
-    {
+        UserRepository $userRepository,
+        MailerInterface $mailer
+    ) {
         $this->twig = $twig;
         $this->transactionRepository = $transactionRepository;
         $this->userRepository = $userRepository;

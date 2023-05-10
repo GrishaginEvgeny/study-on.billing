@@ -30,11 +30,11 @@ class PaymentReportCommand extends Command
     }
 
     public function __construct(
-        Twig                  $twig,
+        Twig $twig,
         TransactionRepository $transactionRepository,
-        UserRepository        $userRepository,
-        MailerInterface       $mailer)
-    {
+        UserRepository $userRepository,
+        MailerInterface $mailer
+    ) {
         $this->twig = $twig;
         $this->transactionRepository = $transactionRepository;
         $this->mailer = $mailer;
@@ -75,12 +75,9 @@ class PaymentReportCommand extends Command
                     ->html($report);
 
                 $this->mailer->send($email);
-
-                $output->writeln('Отчет успешно отправлен!');
-                return Command::SUCCESS;
             } catch (TransportExceptionInterface $e) {
-                $output->writeln($e->getMessage());
-                $output->writeln('Ошибка при формировании и отправке отчета.');
+                $io->error($e->getMessage());
+                $io->error('Ошибка при формировании и отправке отчета.');
 
                 return Command::FAILURE;
             }

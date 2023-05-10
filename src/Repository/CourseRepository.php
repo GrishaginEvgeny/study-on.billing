@@ -21,7 +21,8 @@ class CourseRepository extends ServiceEntityRepository
         parent::__construct($registry, Course::class);
     }
 
-    public function findGreaterThenByCost(float $cost) {
+    public function findGreaterThenByCost(float $cost)
+    {
         $query = $this->getEntityManager()->createQueryBuilder()
             ->select('c')
             ->from('App\Entity\Course', 'c')
@@ -31,7 +32,8 @@ class CourseRepository extends ServiceEntityRepository
         return $query->getQuery()->getResult();
     }
 
-    public function findLessThenByCost(float $cost) {
+    public function findLessThenByCost(float $cost)
+    {
         $query = $this->getEntityManager()->createQueryBuilder()
             ->select('c')
             ->from('App\Entity\Course', 'c')

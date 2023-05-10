@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Services;
 
 use App\Entity\Course;
@@ -7,21 +8,20 @@ use App\Entity\User;
 use App\Repository\TransactionRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use mysql_xdevapi\Exception;
+use PaymentException;
 
 class PaymentService
 {
-
     private EntityManagerInterface $entityManager;
-
     private TransactionRepository $transactionRepository;
-
     private UserRepository $userRepository;
 
     public function __construct(
         EntityManagerInterface $entityManager,
         TransactionRepository $transactionRepository,
-        UserRepository $userRepository)
-    {
+        UserRepository $userRepository
+    ) {
         $this->entityManager = $entityManager;
         $this->transactionRepository = $transactionRepository;
         $this->userRepository = $userRepository;
@@ -29,6 +29,7 @@ class PaymentService
 
     /**
      * @throws \Doctrine\DBAL\Exception
+     * @throws PaymentException
      */
     public function makeDeposit(User $user, float $amount): ?Transaction
     {
@@ -47,7 +48,7 @@ class PaymentService
             return $transaction;
         } catch (\Exception $e) {
             $this->entityManager->getConnection()->rollBack();
-            throw new \Exception($e->getMessage());
+            throw new PaymentException($e->getMessage());
         }
     }
 
@@ -76,7 +77,7 @@ class PaymentService
             return $transaction;
         } catch (\Exception $e) {
             $this->entityManager->getConnection()->rollBack();
-            throw new \RuntimeException($e->getMessage());
+            throw new \PaymentException($e->getMessage());
         }
     }
 }

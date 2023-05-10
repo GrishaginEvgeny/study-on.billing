@@ -8,7 +8,6 @@ use Twig\Loader\FilesystemLoader;
 
 class Twig extends Environment
 {
-
     public function __construct(KernelInterface $kernel)
     {
         $loader = new FilesystemLoader($kernel->getProjectDir() . '/templates');

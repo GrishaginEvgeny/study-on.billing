@@ -24,27 +24,27 @@ class TransactionFixtures extends Fixture implements OrderedFixtureInterface
 
         $transaction = new Transaction();
         $transaction->setType(Transaction::PAYMENT_TYPE)
-            ->setCourse($courseRepository->findOneBy(['characterCode' => 'pythonDeveloper']))
+            ->setCourse($courseRepository->findOneBy(['characterCode' => 'pydev']))
             ->setTransactionUser($userRepository->findOneBy(['email' => 'usualuser@study.com']))
-            ->setAmount($courseRepository->findOneBy(['characterCode' => 'pythonDeveloper'])->getCost())
+            ->setAmount($courseRepository->findOneBy(['characterCode' => 'pydev'])->getCost())
             ->setCreatedAt(new \DateTime('-6 day -5 hours'))
             ->setExpiredAt(new \DateTime('-6 day -5 hours + 1 week'));
         $manager->persist($transaction);
 
         $transaction = new Transaction();
         $transaction->setType(Transaction::PAYMENT_TYPE)
-            ->setCourse($courseRepository->findOneBy(['characterCode' => 'pythonDeveloper']))
+            ->setCourse($courseRepository->findOneBy(['characterCode' => 'pydev']))
             ->setTransactionUser($userRepository->findOneBy(['email' => 'usualuser@study.com']))
-            ->setAmount($courseRepository->findOneBy(['characterCode' => 'pythonDeveloper'])->getCost())
+            ->setAmount($courseRepository->findOneBy(['characterCode' => 'pydev'])->getCost())
             ->setCreatedAt(new \DateTime('-3 week'))
             ->setExpiredAt(new \DateTime('-1 week'));
         $manager->persist($transaction);
 
         $transaction = new Transaction();
         $transaction->setType(Transaction::PAYMENT_TYPE)
-            ->setCourse($courseRepository->findOneBy(['characterCode' => 'pythonDeveloper']))
+            ->setCourse($courseRepository->findOneBy(['characterCode' => 'pydev']))
             ->setTransactionUser($userRepository->findOneBy(['email' => 'usualuser@study.com']))
-            ->setAmount($courseRepository->findOneBy(['characterCode' => 'pythonDeveloper'])->getCost())
+            ->setAmount($courseRepository->findOneBy(['characterCode' => 'pydev'])->getCost())
             ->setCreatedAt(new \DateTime('-2 month'))
             ->setExpiredAt(new \DateTime('-1 month -3 weeks'));
         $manager->persist($transaction);
@@ -67,6 +67,5 @@ class TransactionFixtures extends Fixture implements OrderedFixtureInterface
         $manager->persist($transaction);
 
         $manager->flush();
-
     }
 }

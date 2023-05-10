@@ -10,7 +10,7 @@ class UserDTO
     /**
      * @Serializer\Type("string")
      * @Assert\NotBlank(message="Поле e-mail не может быт пустым.")
-     * @Assert\Email( message="Поле e-mail содержит некорректные данные.")
+     * @Assert\Email(message="Поле e-mail содержит некорректные данные.")
      */
     public ?string $username;
 
@@ -22,5 +22,4 @@ class UserDTO
      *      message="Пароль должен содержать как один из спец. символов (.!@#$%^&*), прописную и строчные буквы латинского алфавита и цифру.")
      */
     public ?string $password;
-
 }

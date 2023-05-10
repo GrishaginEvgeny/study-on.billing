@@ -10,7 +10,6 @@ use Doctrine\ORM\Mapping as ORM;
  */
 class Transaction
 {
-
     public const PAYMENT_TYPE = 0;
 
     public const DEPOSIT_TYPE = 1;

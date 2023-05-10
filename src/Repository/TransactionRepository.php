@@ -8,7 +8,6 @@ use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\Query\Expr\Join;
 use Doctrine\Persistence\ManagerRegistry;
-use Symfony\Component\Validator\Constraints\DateTime;
 
 /**
  * @extends ServiceEntityRepository<Transaction>
@@ -51,11 +50,11 @@ class TransactionRepository extends ServiceEntityRepository
      * @return int|mixed|string
      */
     public function getTransactionsByFilters(
-        ?int    $type = null,
+        ?int $type = null,
         ?string $characterCode = null,
-        ?bool   $skipExpired = null,
-        User    $user)
-    {
+        ?bool $skipExpired = null,
+        User $user
+    ) {
         $query = $this->getEntityManager()->createQueryBuilder()
             ->select('t')
             ->from('App\Entity\Transaction', 't')
@@ -68,17 +67,15 @@ class TransactionRepository extends ServiceEntityRepository
                 ->setParameter('type', $type);
         }
 
-        if ($characterCode) {
+        if (!is_null($characterCode)) {
             $query->andWhere('c.characterCode = :char_code')
                 ->setParameter('char_code', $characterCode);
         }
 
         if ($skipExpired) {
-            $query->andWhere('t.expiredAt > :now_date')
-                ->setParameter('now_date', new \DateTime('now'));
-            if (!$characterCode) {
-                $query->orWhere('t.expiredAt is NULL');
-            }
+            $query->andWhere('(t.expiredAt > :now OR t.expiredAt is NULL) 
+            and (c.type = 2 or c.type = 3)')
+                ->setParameter('now', new \DateTime('now'));
         }
 
         return $query->getQuery()->getResult();
@@ -109,7 +106,9 @@ class TransactionRepository extends ServiceEntityRepository
             ->andWhere('t.transactionUser = :user')
             ->setParameter('user', $user)
             ->andWhere('t.expiredAt < :plus_one_day_date')
-            ->setParameter('plus_one_day_date', new \DateTime('+1 day'));
+            ->setParameter('plus_one_day_date', new \DateTime('+1 day'))
+            ->andWhere('t.expiredAt > :now_date')
+            ->setParameter('now_date', new \DateTime('now'));
         return $query->getQuery()->getResult();
     }
 

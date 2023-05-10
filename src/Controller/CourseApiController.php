@@ -2,105 +2,47 @@
 
 namespace App\Controller;
 
+use App\DTO\CourseDTO;
+use App\DTO\CourseEditDTO;
+use App\DTO\PayDTO;
 use App\Entity\Course;
+use App\ErrorTemplate\ErrorTemplate;
 use App\Repository\CourseRepository;
 use App\Repository\TransactionRepository;
 use App\Services\PaymentService;
+use JMS\Serializer\SerializerInterface;
 use Nelmio\ApiDocBundle\Annotation\Security;
+use OpenApi\Annotations as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
-use OpenApi\Annotations as OA;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
  * @Route("/api/v1/courses")
  */
 class CourseApiController extends AbstractController
 {
-    /**
-     * @param $requestContent
-     * @param CourseRepository $courseRepository
-     * @return bool|JsonResponse
-     */
-    private function validate($requestContent, CourseRepository $courseRepository, bool $isEdit = false, string $previousCode = null)
-    {
-        $fields = ["type" => "Тип", "title" => "Название", "code" => "Символьный код", "price" => "Стоимость курса"];
-        foreach ($fields as $key => $field) {
-            if (!array_key_exists($key, $requestContent)) {
-                return new JsonResponse([
-                    "code" => Response::HTTP_NOT_ACCEPTABLE,
-                    "message" => "В запросе отсутствует поле \"{$field}\"."
-                ], Response::HTTP_NOT_ACCEPTABLE);
-            }
-        }
-        if (strlen($requestContent["code"]) > 255 || strlen($requestContent["code"]) < 1) {
-            $textResponse = strlen($requestContent["code"]) > 255 ? 'длинной более 255 символов' : 'пустым';
-            return new JsonResponse([
-                "code" => Response::HTTP_NOT_ACCEPTABLE,
-                "message" => "Поле \"Cимвольный код\" не должно быть {$textResponse}."
-            ], Response::HTTP_NOT_ACCEPTABLE);
-        }
-        if (!preg_match('/^[A-Za-z0-9]+$/', $requestContent["code"])) {
-            return new JsonResponse([
-                "code" => Response::HTTP_NOT_ACCEPTABLE,
-                "message" => 'В поле "Cимвольный код" могут содержаться только цифры и латиница.'
-            ], Response::HTTP_NOT_ACCEPTABLE);
-        }
-        if (strlen($requestContent["title"]) > 255 || strlen($requestContent["title"]) < 1) {
-            $textResponse = strlen($requestContent["title"]) > 255 ? 'длинной более 255 символов' : 'пустым';
-            return new JsonResponse([
-                "code" => Response::HTTP_NOT_ACCEPTABLE,
-                "message" => "Поле \"Название код\" не должно быть {$textResponse}."
-            ], Response::HTTP_NOT_ACCEPTABLE);
-        }
-        if (!array_key_exists($requestContent["type"], Course::TYPES_ARRAY)) {
-            return new JsonResponse([
-                "code" => Response::HTTP_NOT_ACCEPTABLE,
-                "message" => "Поле \"Тип\" не должно иметь значение: \"rent\", \"buy\" или \"free\"."
-            ], Response::HTTP_NOT_ACCEPTABLE);
-        }
-        if (!is_numeric($requestContent["price"])) {
-            return new JsonResponse([
-                "code" => Response::HTTP_NOT_ACCEPTABLE,
-                "message" => "Поле \"Стоимость курса\" можно вводить только цифры."
-            ], Response::HTTP_NOT_ACCEPTABLE);
-        }
-        if ($requestContent["price"] !== 0 && $requestContent["type"] === "free") {
-            return new JsonResponse([
-                "code" => Response::HTTP_NOT_ACCEPTABLE,
-                "message" => 'Курс с типом "Бесплатный" не может иметь стоимость.'
-            ], Response::HTTP_NOT_ACCEPTABLE);
-        }
-        if ($requestContent["price"] <= 0 && $requestContent["type"] !== "free") {
-            return new JsonResponse([
-                "code" => Response::HTTP_NOT_ACCEPTABLE,
-                "message" => 'Курс с типом "Аренда" или "Покупка" не может нулевую или отрицательную стоимость.'
-            ], Response::HTTP_NOT_ACCEPTABLE);
-        }
-        $existedCourse = $isEdit ? $courseRepository->findOneBy(['characterCode' => $previousCode])
-            :  $courseRepository->findOneBy(['characterCode' => $requestContent["code"]]);
-        if (!is_null($existedCourse) && !$isEdit) {
-            return new JsonResponse([
-                "code" => Response::HTTP_NOT_ACCEPTABLE,
-                "message" => 'Курс с таким символьным кодом уже существует.'
-            ], Response::HTTP_NOT_ACCEPTABLE);
-        }
-        if (is_null($existedCourse) && $isEdit) {
-            $newCodeCourse = $courseRepository->findOneBy(['characterCode' => $requestContent["code"]]);
-            if (!is_null($newCodeCourse)) {
-                return new JsonResponse([
-                    "code" => Response::HTTP_NOT_ACCEPTABLE,
-                    "message" => 'Курс с таким символьным кодом уже существует.'
-                ], Response::HTTP_NOT_ACCEPTABLE);
-            }
-            return new JsonResponse([
-                "code" => Response::HTTP_NOT_FOUND,
-                "message" => 'Курс с таким символьным кодом не существует.'
-            ], Response::HTTP_NOT_FOUND);
-        }
-        return "success";
+    private CourseRepository $courseRepository;
+
+    private PaymentService $paymentService;
+
+    private SerializerInterface $serializer;
+
+    private ValidatorInterface $validator;
+
+    public function __construct(
+        CourseRepository $courseRepository,
+        PaymentService $paymentService,
+        SerializerInterface $serializer,
+        ValidatorInterface $validator
+    ) {
+        $this->serializer = $serializer;
+        $this->courseRepository = $courseRepository;
+        $this->paymentService = $paymentService;
+        $this->validator = $validator;
     }
 
     /**
@@ -119,7 +61,7 @@ class CourseApiController extends AbstractController
      *     type="array",
      *     @OA\Items(
      *        @OA\Property(
-     *          property="character_code",
+     *          property="course_code",
      *          type="string",
      *        ),
      *        @OA\Property(
@@ -150,13 +92,13 @@ class CourseApiController extends AbstractController
      * )
      * @OA\Tag(name="CourseApi")
      */
-    public function courses(CourseRepository $courseRepository): JsonResponse
+    public function courses(): JsonResponse
     {
-        $courses = $courseRepository->findAll();
+        $courses = $this->courseRepository->findAll();
         $response = [];
         foreach ($courses as $course) {
             $response[] = [
-                'character_code' => $course->getCharacterCode(),
+                'course_code' => $course->getCharacterCode(),
                 'type' => $course->getTypeCode(),
                 'price' => $course->getCost()
             ];
@@ -177,7 +119,7 @@ class CourseApiController extends AbstractController
      *     description="Ответ при удачном запросе",
      *     @OA\JsonContent(
      *        @OA\Property(
-     *          property="character_code",
+     *          property="course_code",
      *          type="string",
      *        ),
      *        @OA\Property(
@@ -222,19 +164,17 @@ class CourseApiController extends AbstractController
      * )
      * @OA\Tag(name="CourseApi")
      */
-    public function course(
-        string           $code,
-        CourseRepository $courseRepository): JsonResponse
+    public function course(string $code): JsonResponse
     {
-        $course = $courseRepository->findOneBy(['characterCode' => $code]);
+        $course = $this->courseRepository->findOneBy(['characterCode' => $code]);
         if (!$course) {
             return new JsonResponse([
                 'code' => Response::HTTP_NOT_FOUND,
-                'message' => 'Курс с таким символьным кодом не найден.',
+                'message' => ErrorTemplate::COURSE_DOESNT_EXIST_TEXT
             ], Response::HTTP_NOT_FOUND);
         }
         return new JsonResponse([
-            "character_code" => $course->getCharacterCode(),
+            "course_code" => $course->getCharacterCode(),
             "type" => $course->getTypeCode(),
             "price" => $course->getCost()
         ]);
@@ -299,8 +239,8 @@ class CourseApiController extends AbstractController
      *     )
      * )
      * @OA\Response(
-     *     response="406/1",
-     *     description="Ответ при запросе к покупке курса c недостаточным балансом",
+     *     response=406,
+     *     description="Ответ при неудачном прохождении валидации",
      *     @OA\JsonContent(
      *       @OA\Property(
      *          property="code",
@@ -308,73 +248,14 @@ class CourseApiController extends AbstractController
      *          example="406"
      *        ),
      *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="У вас не достаточно средств на счёте для (аренды|покупки) этого курса."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/2",
-     *     description="Ответ при аренде курса, аренда которого ещё не истекла.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Этот курс уже арендован и длительность аренды ещё не истекла."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/3",
-     *     description="Ответ при покупке курса, когда он уже приобретён.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Этот курс уже куплен."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/4",
-     *     description="Ответ при покупке курса, когда он уже приобретён.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Этот курс уже куплен."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/5",
-     *     description="Ответ при запросе к покупке бесплатного курса",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Этот курс бесплатен и не требует покупки."
+     *          property="errors",
+     *          type="array",
+     *          @OA\Items(
+     *              @OA\Property(
+     *                  type="string",
+     *                  property="error_field"
+     *              )
+     *          )
      *        ),
      *     )
      * )
@@ -395,78 +276,47 @@ class CourseApiController extends AbstractController
      * @OA\Tag(name="CourseApi")
      * @Security(name="Bearer")
      */
-    public function pay(
-        string                $code,
-        CourseRepository      $courseRepository,
-        PaymentService        $paymentService,
-        TransactionRepository $transactionRepository): JsonResponse
+    public function pay(string $code): JsonResponse
     {
-        $course = $courseRepository->findOneBy(['characterCode' => $code]);
+        $course = $this->courseRepository->findOneBy(['characterCode' => $code]);
         $user = $this->getUser();
+
         if (!$course) {
             return new JsonResponse([
                 'code' => Response::HTTP_NOT_FOUND,
-                'message' => 'Курс с таким символьным кодом не найден.',
+                'message' => ErrorTemplate::COURSE_DOESNT_EXIST_TEXT
             ], Response::HTTP_NOT_FOUND);
         }
+
         if (!$user) {
             return new JsonResponse([
                 'code' => Response::HTTP_UNAUTHORIZED,
-                'message' => 'Вы не авторизованы.',
+                'message' => ErrorTemplate::USER_UNAUTH_TEXT
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        if ($course->getTypeCode() === 'free') {
+        $payDTO = new PayDTO($user, $course);
+        $errorsFromDto = $this->validator->validate($payDTO);
+        if (count($errorsFromDto) > 0) {
+            $errors = [];
+            foreach ($errorsFromDto as $error) {
+                $errors[] = $error->getMessage();
+            }
             return new JsonResponse([
                 'code' => Response::HTTP_NOT_ACCEPTABLE,
-                'message' => 'Этот курс бесплатен и не требует покупки.',
+                'errors' => $errors,
             ], Response::HTTP_NOT_ACCEPTABLE);
         }
 
-        if ($user->getBalance() < $course->getCost()) {
-            $typeOfTransactionText = $course->getTypeCode() === 'rent' ? 'аренды' : 'покупки';
-            return new JsonResponse([
-                'code' => Response::HTTP_NOT_ACCEPTABLE,
-                'message' => "У вас не достаточно средств на счёте для " .
-                    "{$typeOfTransactionText} этого курса.",
-            ], Response::HTTP_NOT_ACCEPTABLE);
+        $transaction = $this->paymentService->makePayment($user, $course);
+        $response = [
+            "success" => true,
+            "course_type" => $transaction->getCourse()->getTypeCode(),
+        ];
+        if ($transaction->getExpiredAt()) {
+            $response["expires_at"] = $transaction->getExpiredAt()->format(DATE_ATOM);
         }
-        try {
-            $existedTransaction = $course->getTypeCode() === "buy" ? $transactionRepository
-                ->findOneBy(['transactionUser' => $user, 'course' => $course, 'type' => 0]) :
-                $transactionRepository->getTransactionOnTypeRentWithMaxDate($course, $user);
-            if ($existedTransaction) {
-                if ($existedTransaction->getCourse()->getTypeCode() === 'rent'
-                    && $existedTransaction->getExpiredAt() > new \DateTimeImmutable('now')
-                ) {
-                    return new JsonResponse([
-                        'code' => Response::HTTP_NOT_ACCEPTABLE,
-                        'message' => 'Этот курс уже арендован и длительность аренды ещё не истекла.',
-                    ], Response::HTTP_NOT_ACCEPTABLE);
-                }
-                if ($existedTransaction->getCourse()->getTypeCode() === 'buy') {
-                    return new JsonResponse([
-                        'code' => Response::HTTP_NOT_ACCEPTABLE,
-                        'message' => 'Этот курс уже куплен.',
-                    ], Response::HTTP_NOT_ACCEPTABLE);
-                }
-            }
-
-            $transaction = $paymentService->makePayment($user, $course);
-            $response = [
-                "success" => true,
-                "course_type" => $transaction->getCourse()->getTypeCode(),
-            ];
-            if ($transaction->getExpiredAt()) {
-                $response["expires_at"] = $transaction->getExpiredAt()->format(DATE_ATOM);
-            }
-            return new JsonResponse($response, Response::HTTP_CREATED);
-        } catch (\Exception $exception) {
-            return new JsonResponse([
-                'code' => Response::HTTP_INTERNAL_SERVER_ERROR,
-                'message' => $exception->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return new JsonResponse($response, Response::HTTP_CREATED);
     }
 
     /**
@@ -503,8 +353,8 @@ class CourseApiController extends AbstractController
      * )
      * )
      * @OA\Response(
-     *     response="406/1",
-     *     description="Ответ при запросе, когда не добавлено одно из нужных полей",
+     *     response=406,
+     *     description="Ответ при неудачном прохождении валидации",
      *     @OA\JsonContent(
      *       @OA\Property(
      *          property="code",
@@ -512,121 +362,14 @@ class CourseApiController extends AbstractController
      *          example="406"
      *        ),
      *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="В запросе отсутствует поле <поле>."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/2",
-     *     description="Ответ при запросе, когда одно из полей не соответсвует размером.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Поле <поле> не должно быть  длинной более <limit> символов|пустым."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/3",
-     *     description="Ответ при запросе, когда символьный код содержит что-то помимо цифр и латиницы.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="В поле Cимвольный код могут содержаться только цифры и латиница."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/4",
-     *     description="Ответ при запросе, когда вверён неверный тип курса",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Поле Тип не должно иметь значение: rent, buy или free."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/5",
-     *     description="Ответ при запросе, когда введено неверное значение в поле суммы",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Поле Стоимость курса можно вводить только цифры."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/6",
-     *     description="Ответ при запросе, когда для бесплатного курса ненулевая сумма.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Курс с типом Бесплатный не может иметь стоимость."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/7",
-     *     description="Ответ при запросе, когда для у платных курсов нулевая сумма.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Курс с типом Аренда или Покупка не может нулевую или отрицательную стоимость."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/8",
-     *     description="Ответ при запросе, когда курс с таким символным кодом существует.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Курс с таким символьным кодом уже существует."
+     *          property="errors",
+     *          type="array",
+     *          @OA\Items(
+     *              @OA\Property(
+     *                  type="string",
+     *                  property="error_field"
+     *              )
+     *          )
      *        ),
      *     )
      * )
@@ -647,27 +390,34 @@ class CourseApiController extends AbstractController
      * @OA\Tag(name="CourseApi")
      * @Security(name="Bearer")
      */
-    public function new(Request $request, CourseRepository $courseRepository)
+    public function new(Request $request)
     {
         if (!$this->getUser() || !in_array('ROLE_SUPER_ADMIN', $this->getUser()->getRoles(), true)) {
             return new JsonResponse([
                 "code" => Response::HTTP_FORBIDDEN,
-                "message" => "К этому запросу имеет доступ только пользователь с правами администратора."
+                "message" => ErrorTemplate::ACCESS_RIGHT_TEXT
             ], Response::HTTP_FORBIDDEN);
         }
-
-        $requestContent = json_decode($request->getContent(), true);
-        $validateResult = $this->validate($requestContent, $courseRepository);
-        if($validateResult !== "success"){
-            return $validateResult;
+        $courseDTO = $this->serializer
+            ->deserialize($request->getContent(), CourseDTO::class, 'json');
+        $errorsFromDto = $this->validator->validate($courseDTO);
+        if (count($errorsFromDto) > 0) {
+            $errors = [];
+            foreach ($errorsFromDto as $error) {
+                $errors[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return new JsonResponse([
+                'code' => Response::HTTP_NOT_ACCEPTABLE,
+                'errors' => $errors,
+            ], Response::HTTP_NOT_ACCEPTABLE);
         }
         $course = new Course();
         $course
-            ->setCharacterCode($requestContent["code"])
-            ->setCost($requestContent["price"])
-            ->setType(Course::TYPES_ARRAY[$requestContent["type"]])
-            ->setName($requestContent["title"]);
-        $courseRepository->add($course, true);
+            ->setCharacterCode($courseDTO->code)
+            ->setCost($courseDTO->price)
+            ->setType(Course::TYPES_ARRAY[$courseDTO->type])
+            ->setName($courseDTO->title);
+        $this->courseRepository->add($course, true);
         return new JsonResponse([
             "success" => true
         ], Response::HTTP_CREATED);
@@ -707,134 +457,6 @@ class CourseApiController extends AbstractController
      * )
      * )
      * @OA\Response(
-     *     response="406/1",
-     *     description="Ответ при запросе, когда не добавлено одно из нужных полей",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="В запросе отсутствует поле <поле>."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/2",
-     *     description="Ответ при запросе, когда одно из полей не соответсвует размером.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Поле <поле> не должно быть  длинной более <limit> символов|пустым."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/3",
-     *     description="Ответ при запросе, когда символьный код содержит что-то помимо цифр и латиницы.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="В поле Cимвольный код могут содержаться только цифры и латиница."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/4",
-     *     description="Ответ при запросе, когда вверён неверный тип курса",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Поле Тип не должно иметь значение: rent, buy или free."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/5",
-     *     description="Ответ при запросе, когда введено неверное значение в поле суммы",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Поле Стоимость курса можно вводить только цифры."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/6",
-     *     description="Ответ при запросе, когда для бесплатного курса ненулевая сумма.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Курс с типом Бесплатный не может иметь стоимость."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/7",
-     *     description="Ответ при запросе, когда для у платных курсов нулевая сумма.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Курс с типом Аренда или Покупка не может нулевую или отрицательную стоимость."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
-     *     response="406/8",
-     *     description="Ответ при запросе, когда курс с таким символным кодом существует.",
-     *     @OA\JsonContent(
-     *       @OA\Property(
-     *          property="code",
-     *          type="string",
-     *          example="406"
-     *        ),
-     *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Курс с таким символьным кодом уже существует."
-     *        ),
-     *     )
-     * )
-     * @OA\Response(
      *     response="404",
      *     description="Ответ при запросе, когда курс с таким символным кодом не существует.",
      *     @OA\JsonContent(
@@ -847,6 +469,27 @@ class CourseApiController extends AbstractController
      *          property="message",
      *          type="string",
      *          example="Курс с таким символьным кодом уже существует."
+     *        ),
+     *     )
+     * )
+     * @OA\Response(
+     *     response=406,
+     *     description="Ответ при неудачном прохождении валидации",
+     *     @OA\JsonContent(
+     *       @OA\Property(
+     *          property="code",
+     *          type="string",
+     *          example="406"
+     *        ),
+     *        @OA\Property(
+     *          property="errors",
+     *          type="array",
+     *          @OA\Items(
+     *              @OA\Property(
+     *                  type="string",
+     *                  property="error_field"
+     *              )
+     *          )
      *        ),
      *     )
      * )
@@ -867,27 +510,49 @@ class CourseApiController extends AbstractController
      * @OA\Tag(name="CourseApi")
      * @Security(name="Bearer")
      */
-    public function edit(string $code, Request $request, CourseRepository $courseRepository)
+    public function edit(string $code, Request $request)
     {
         if (!$this->getUser() || !in_array('ROLE_SUPER_ADMIN', $this->getUser()->getRoles(), true)) {
             return new JsonResponse([
                 "code" => Response::HTTP_FORBIDDEN,
-                "message" => "К этому запросу имеет доступ только пользователь с правами администратора."
+                "message" => ErrorTemplate::ACCESS_RIGHT_TEXT
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $requestContent = json_decode($request->getContent(), true);
-        $validateResult = $this->validate($requestContent, $courseRepository, true, $code);
-        if($validateResult !== "success"){
-            return $validateResult;
+        $course = $this->courseRepository->findOneBy(['characterCode' => $code]);
+        if (is_null($course)) {
+            return new JsonResponse([
+                "code" => Response::HTTP_NOT_FOUND,
+                "message" => ErrorTemplate::COURSE_DOESNT_EXIST_TEXT
+            ], Response::HTTP_NOT_FOUND);
         }
-        $course = $courseRepository->findOneBy(['characterCode' => $code]);
+
+        $courseDTO = $this->serializer
+            ->deserialize($request->getContent(), CourseDTO::class, 'json');
+        $errorsFromDto = $this->validator->validate($courseDTO);
+        if (count($errorsFromDto) > 0) {
+            $errors = [];
+            foreach ($errorsFromDto as $error) {
+                $errors[$error->getPropertyPath()] = $error->getMessage();
+            }
+            if (
+                !(count($errors) === 1 &&
+                in_array(ErrorTemplate::COURSE_EXIST_TEXT, $errors) &&
+                $code === $courseDTO->code)
+            ) {
+                return new JsonResponse([
+                    'code' => Response::HTTP_NOT_ACCEPTABLE,
+                    'errors' => $errors,
+                ], Response::HTTP_NOT_ACCEPTABLE);
+            }
+        }
+
         $course
-            ->setCharacterCode($requestContent["code"])
-            ->setCost($requestContent["price"])
-            ->setType(Course::TYPES_ARRAY[$requestContent["type"]])
-            ->setName($requestContent["title"]);
-        $courseRepository->add($course, true);
+            ->setCharacterCode($courseDTO->code)
+            ->setCost($courseDTO->price)
+            ->setType(Course::TYPES_ARRAY[$courseDTO->type])
+            ->setName($courseDTO->title);
+        $this->courseRepository->add($course, true);
         return new JsonResponse([
             "success" => true
         ], Response::HTTP_CREATED);

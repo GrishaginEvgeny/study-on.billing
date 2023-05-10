@@ -12,10 +12,8 @@ use Gesdinet\JWTRefreshTokenBundle\Generator\RefreshTokenGeneratorInterface;
 use Gesdinet\JWTRefreshTokenBundle\Model\RefreshTokenManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-
 class UserFixtures extends Fixture implements OrderedFixtureInterface
 {
-
     public function getOrder(): int
     {
         return 0;
@@ -29,8 +27,8 @@ class UserFixtures extends Fixture implements OrderedFixtureInterface
      */
     public function __construct(
         UserPasswordHasherInterface $hasher,
-        PaymentService              $paymentService)
-    {
+        PaymentService $paymentService
+    ) {
         $this->hasher = $hasher;
         $this->paymentService = $paymentService;
     }

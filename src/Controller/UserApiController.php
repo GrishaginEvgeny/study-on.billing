@@ -4,26 +4,21 @@ namespace App\Controller;
 
 use App\DTO\UserDTO;
 use App\Entity\User;
+use App\ErrorTemplate\ErrorTemplate;
 use App\Repository\UserRepository;
 use App\Services\PaymentService;
 use Gesdinet\JWTRefreshTokenBundle\Generator\RefreshTokenGeneratorInterface;
 use Gesdinet\JWTRefreshTokenBundle\Model\RefreshTokenManagerInterface;
-use JMS\Serializer\Serializer;
 use JMS\Serializer\SerializerBuilder;
-use Lexik\Bundle\JWTAuthenticationBundle\Encoder\JWTEncoderInterface;
-use Lexik\Bundle\JWTAuthenticationBundle\Encoder\LcobucciJWTEncoder;
-use Lexik\Bundle\JWTAuthenticationBundle\Services\JWSProvider\JWSProviderInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Nelmio\ApiDocBundle\Annotation\Security;
+use OpenApi\Annotations as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
-use OpenApi\Annotations as OA;
-use Nelmio\ApiDocBundle\Annotation\Model;
-use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
@@ -31,22 +26,36 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  */
 class UserApiController extends AbstractController
 {
-
     private ValidatorInterface $validator;
 
     private UserPasswordHasherInterface $hasher;
 
     private JWTTokenManagerInterface $JWTTokenManager;
 
+    private UserRepository $userRepository;
+
+    private RefreshTokenGeneratorInterface $refreshTokenGenerator;
+
+    private RefreshTokenManagerInterface $refreshTokenManager;
+
+    private PaymentService $paymentService;
+
     public function __construct(
-        ValidatorInterface          $validator,
+        ValidatorInterface $validator,
         UserPasswordHasherInterface $hasher,
-        JWTTokenManagerInterface    $JWTTokenManager
-    )
-    {
+        JWTTokenManagerInterface $JWTTokenManager,
+        UserRepository $userRepository,
+        RefreshTokenGeneratorInterface $refreshTokenGenerator,
+        RefreshTokenManagerInterface $refreshTokenManager,
+        PaymentService $paymentService
+    ) {
         $this->validator = $validator;
         $this->hasher = $hasher;
         $this->JWTTokenManager = $JWTTokenManager;
+        $this->userRepository = $userRepository;
+        $this->refreshTokenGenerator = $refreshTokenGenerator;
+        $this->refreshTokenManager = $refreshTokenManager;
+        $this->paymentService = $paymentService;
     }
 
     /**
@@ -83,6 +92,10 @@ class UserApiController extends AbstractController
      *     @OA\JsonContent(
      *        @OA\Property(
      *          property="token",
+     *          type="string",
+     *        ),
+     *         @OA\Property(
+     *          property="refresh_token",
      *          type="string",
      *        )
      *     )
@@ -121,7 +134,6 @@ class UserApiController extends AbstractController
      */
     public function auth()
     {
-
     }
 
     /**
@@ -174,11 +186,6 @@ class UserApiController extends AbstractController
      *          example="400"
      *        ),
      *        @OA\Property(
-     *          property="message",
-     *          type="string",
-     *          example="Ошибка регистрации"
-     *        ),
-     *        @OA\Property(
      *          property="errors",
      *          type="array",
      *          @OA\Items(
@@ -207,12 +214,7 @@ class UserApiController extends AbstractController
      * @OA\Tag(name="UserApi")
      * @throws \Doctrine\DBAL\Exception
      */
-    public function register(
-        Request                        $request,
-        UserRepository                 $userRepository,
-        RefreshTokenGeneratorInterface $refreshTokenGenerator,
-        RefreshTokenManagerInterface   $refreshTokenManager,
-        PaymentService                 $paymentService): JsonResponse
+    public function register(Request $request): JsonResponse
     {
         $serializer = SerializerBuilder::create()->build();
         $userDto = $serializer->deserialize($request->getContent(), UserDTO::class, 'json');
@@ -224,17 +226,15 @@ class UserApiController extends AbstractController
             }
             return new JsonResponse([
                 'code' => Response::HTTP_BAD_REQUEST,
-                'error_description' => 'Ошибка регистрации',
                 'errors' => $errors,
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        if ($userRepository->findOneBy(['email' => $userDto->username])) {
+        if ($this->userRepository->findOneBy(['email' => $userDto->username])) {
             return new JsonResponse([
                 'code' => Response::HTTP_BAD_REQUEST,
-                'error_description' => 'Ошибка регистрации',
                 'errors' => [
-                    "username" => 'Пользователь с таким E-mail уже зарегистрирован.'
+                    "username" => ErrorTemplate::NOT_UNIQUE_EMAIL_TEXT
                 ],
             ], Response::HTTP_BAD_REQUEST);
         }
@@ -242,13 +242,13 @@ class UserApiController extends AbstractController
         $newUser = User::fromDTO($userDto);
         $newUser->setPassword($this->hasher->hashPassword($newUser, $userDto->password));
         $newUser->setRoles(['ROLE_USER']);
-        $userRepository->add($newUser, true);
-        $refreshToken = $refreshTokenGenerator->createForUserWithTtl(
+        $this->userRepository->add($newUser, true);
+        $refreshToken = $this->refreshTokenGenerator->createForUserWithTtl(
             $newUser,
             (new \DateTime())->modify('+1 month')->getTimestamp()
         );
-        $refreshTokenManager->save($refreshToken);
-        $paymentService->makeDeposit($newUser, $_ENV['BASE_BALANCE']);
+        $this->refreshTokenManager->save($refreshToken);
+        $this->paymentService->makeDeposit($newUser, $_ENV['BASE_BALANCE']);
 
 
         return new JsonResponse([
@@ -334,7 +334,6 @@ class UserApiController extends AbstractController
         }
 
         return new JsonResponse([
-            'code' => Response::HTTP_OK,
             'username' => $this->getUser()->getUserIdentifier(),
             'roles' => $this->getUser()->getRoles(),
             'balance' => $this->getUser()->getBalance(),

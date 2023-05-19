@@ -43,15 +43,17 @@ class PayDTO
     {
         if ($this->course->getType() === Course::FREE_TYPE) {
             $context
-                ->buildViolation(ErrorTemplate::BUY_FREE_COURSE_TEXT)
+                ->buildViolation("errors.pay.buy_free_course")
                 ->addViolation();
         }
 
         if ($this->user->getBalance() < $this->course->getCost()) {
             $transactionText = $this->course->getType() === Course::RENT_TYPE ?
-                ErrorTemplate::NOT_ENOUGH_FOR_RENT_TEXT : ErrorTemplate::NOT_ENOUGH_FOR_BUY_TEXT;
+                "errors.pay.not_enough_rent" : "errors.pay.not_enough_buy";
             $context
                 ->buildViolation($transactionText)
+                ->setTranslationDomain('validators')
+                ->setParameters([])
                 ->addViolation();
         }
     }

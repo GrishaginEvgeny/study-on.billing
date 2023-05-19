@@ -1,13 +1,14 @@
 <?php
 
+namespace App\Tests;
+
 use App\Entity\Transaction;
-use App\ErrorTemplate\ErrorTemplate;
 use App\Repository\CourseRepository;
 use App\Repository\TransactionRepository;
 use App\Repository\UserRepository;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-class CourseApiTest extends \App\Tests\AbstractTest
+class CourseApiTest extends AbstractTest
 {
     private array $usersCredentials = [
         ['username' => 'usualuser@study.com', 'password' => 'user'],
@@ -66,6 +67,7 @@ class CourseApiTest extends \App\Tests\AbstractTest
     public function testGetCourseWithWrongCode()
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         $client->request(
             'GET',
             "/api/v1/courses/wrongcourse123",
@@ -75,7 +77,7 @@ class CourseApiTest extends \App\Tests\AbstractTest
         );
         $content = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseNotFound();
-        $this->assertSame(ErrorTemplate::COURSE_DOESNT_EXIST_TEXT, $content['message']);
+        $this->assertSame($translator->trans('errors.course.doesnt_exist', [], 'validators'), $content['message']);
     }
 
     public function testPayForCourseSuccessfully()
@@ -117,6 +119,7 @@ class CourseApiTest extends \App\Tests\AbstractTest
     public function testPayForCourseWhichNotExist()
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         foreach ($this->usersCredentials as $user) {
             $client->request(
                 'POST',
@@ -141,13 +144,18 @@ class CourseApiTest extends \App\Tests\AbstractTest
             $this->assertResponseCode(404);
             $courseContent = json_decode($client->getResponse()->getContent(), true);
             $this->assertEquals(404, $courseContent["code"]);
-            $this->assertEquals(ErrorTemplate::COURSE_DOESNT_EXIST_TEXT, $courseContent["message"]);
+            $this->assertEquals($translator->trans(
+                'errors.course.doesnt_exist',
+                [],
+                'validators'
+            ), $courseContent["message"]);
         }
     }
 
     public function testPayForCourseWithNonAuth()
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $courses = $courseRepository->findAll();
         foreach ($courses as $course) {
@@ -162,7 +170,11 @@ class CourseApiTest extends \App\Tests\AbstractTest
                 $this->assertResponseCode(401);
                 $content = json_decode($client->getResponse()->getContent(), true);
                 $this->assertEquals(401, $content["code"]);
-                $this->assertEquals(ErrorTemplate::USER_UNAUTH_TEXT, $content["message"]);
+                $this->assertEquals($translator->trans(
+                    'errors.user.doesnt_auth',
+                    [],
+                    'validators'
+                ), $content["message"]);
             }
         }
     }
@@ -170,6 +182,7 @@ class CourseApiTest extends \App\Tests\AbstractTest
     public function testPayForFreeCourse()
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $courses = $courseRepository->findAll();
         foreach ($this->usersCredentials as $user) {
@@ -199,7 +212,11 @@ class CourseApiTest extends \App\Tests\AbstractTest
                     $courseContent = json_decode($client->getResponse()->getContent(), true);
                     $this->assertEquals(406, $courseContent["code"]);
                     $this->assertArrayHasKey('errors', $courseContent);
-                    $this->assertContains(ErrorTemplate::BUY_FREE_COURSE_TEXT, $courseContent["errors"]);
+                    $this->assertContains($translator->trans(
+                        'errors.pay.buy_free_course',
+                        [],
+                        'validators'
+                    ), $courseContent["errors"]);
                 }
             }
         }
@@ -216,6 +233,7 @@ class CourseApiTest extends \App\Tests\AbstractTest
             ['CONTENT_TYPE' => 'application/json'],
             json_encode(['username' => 'usualuser@study.com', 'password' => 'user'])
         );
+        $translator = $this->getContainer()->get('translator');
         $this->assertResponseCode(200);
         $userContent = json_decode($client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('token', $userContent);
@@ -234,7 +252,8 @@ class CourseApiTest extends \App\Tests\AbstractTest
             $courseContent = json_decode($client->getResponse()->getContent(), true);
             $this->assertEquals(406, $courseContent["code"]);
             $textForResponse = $course->getTypeCode() === 'rent'
-                ? ErrorTemplate::NOT_ENOUGH_FOR_RENT_TEXT : ErrorTemplate::NOT_ENOUGH_FOR_BUY_TEXT;
+                ? $translator->trans('errors.pay.not_enough_rent', [], 'validators')
+                : $translator->trans('errors.pay.not_enough_buy', [], 'validators');
             $this->assertArrayHasKey('errors', $courseContent);
             $this->assertContains($textForResponse, $courseContent["errors"]);
         }
@@ -244,6 +263,7 @@ class CourseApiTest extends \App\Tests\AbstractTest
     public function testPayForBoughtCourse()
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         $courseRepository = $this->getContainer()->get(\App\Repository\CourseRepository::class);
         $courses = $courseRepository->findLessThenByCost(500);
         foreach ($this->usersCredentials as $user) {
@@ -286,8 +306,8 @@ class CourseApiTest extends \App\Tests\AbstractTest
                     $courseContent = json_decode($client->getResponse()->getContent(), true);
                     $this->assertEquals(406, $courseContent["code"]);
                     $textForResponse = $course->getTypeCode() === 'rent' ?
-                        ErrorTemplate::RENTED_COURSE_TEXT :
-                        ErrorTemplate::PURCHASED_COURSE_TEXT;
+                        $translator->trans('errors.pay.already_rented', [], 'validators') :
+                        $translator->trans('errors.pay.already_purchased', [], 'validators');
                     $this->assertArrayHasKey('errors', $courseContent);
                     $this->assertContains($textForResponse, $courseContent["errors"]);
                 }
@@ -522,6 +542,7 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $client = $this->getClient();
         $courseRepository = $this->getContainer()->get(CourseRepository::class);
         $userRepository = $this->getContainer()->get(UserRepository::class);
+        $translator = static::getContainer()->get('translator');
         $userRepo = $userRepository->findOneBy(['email' => 'admin@study.com']);
         $client->request(
             'POST',
@@ -547,7 +568,7 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $this->assertResponseCode(406);
         $this->assertArrayHasKey("errors", $courseContent);
         $this->assertContains(
-            "В поле Cимвольный код могут содержаться только цифры и латиница.",
+            $translator->trans('errors.course.slug.wrong_regex', [], 'validators'),
             $courseContent["errors"]
         );
     }
@@ -558,6 +579,7 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $courseRepository = $this->getContainer()->get(CourseRepository::class);
         $userRepository = $this->getContainer()->get(UserRepository::class);
         $userRepo = $userRepository->findOneBy(['email' => 'admin@study.com']);
+        $translator = static::getContainer()->get('translator');
         $client->request(
             'POST',
             '/api/v1/auth',
@@ -587,11 +609,11 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $this->assertResponseCode(406);
         $this->assertArrayHasKey("errors", $courseContent);
         $this->assertContains(
-            "Поле Cимвольный код не должно длинной более 255 символов.",
+            $translator->trans('errors.course.slug.too_big', [], 'validators'),
             $courseContent["errors"]
         );
         $this->assertContains(
-            "Поле Название не должно длинной более 255 символов.",
+            $translator->trans('errors.course.name.too_big', [], 'validators'),
             $courseContent["errors"]
         );
         $client->request(
@@ -609,11 +631,11 @@ class CourseApiTest extends \App\Tests\AbstractTest
         $this->assertArrayHasKey("errors", $courseContent);
         $this->assertArrayHasKey("errors", $courseContent);
         $this->assertContains(
-            "Поле Cимвольный код не должно быть пустым.",
+            $translator->trans('errors.course.slug.too_tiny', [], 'validators'),
             $courseContent["errors"]
         );
         $this->assertContains(
-            "Поле Название не должно быть пустым.",
+            $translator->trans('errors.course.name.too_tiny', [], 'validators'),
             $courseContent["errors"]
         );
     }
@@ -621,6 +643,7 @@ class CourseApiTest extends \App\Tests\AbstractTest
     public function testAddWithTypeCostConflicts()
     {
         $client = $this->getClient();
+        $translator = static::getContainer()->get('translator');
         $courseRepository = $this->getContainer()->get(CourseRepository::class);
         $userRepository = $this->getContainer()->get(UserRepository::class);
         $userRepo = $userRepository->findOneBy(['email' => 'admin@study.com']);
@@ -648,7 +671,11 @@ class CourseApiTest extends \App\Tests\AbstractTest
         );
         $courseContent = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseCode(406);
-        $this->assertContains(ErrorTemplate::FREE_WITH_PRICE_TEXT, $courseContent["errors"]);
+        $this->assertContains($translator->trans(
+            'errors.course.price.free_with_cost',
+            [],
+            'validators'
+        ), $courseContent["errors"]);
         $client->request(
             'POST',
             "/api/v1/courses",
@@ -661,7 +688,11 @@ class CourseApiTest extends \App\Tests\AbstractTest
         );
         $courseContent = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseCode(406);
-        $this->assertContains(ErrorTemplate::COSTABLE_WITH_ZERO_COST_TEXT, $courseContent["errors"]);
+        $this->assertContains($translator->trans(
+            'errors.course.price.buyable_without_cost',
+            [],
+            'validators'
+        ), $courseContent["errors"]);
         $client->request(
             'POST',
             "/api/v1/courses",
@@ -674,12 +705,17 @@ class CourseApiTest extends \App\Tests\AbstractTest
         );
         $courseContent = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseCode(406);
-        $this->assertContains(ErrorTemplate::WRONG_TYPE_TEXT, $courseContent["errors"]);
+        $this->assertContains($translator->trans(
+            'errors.course.type.wrong_type',
+            [],
+            'validators'
+        ), $courseContent["errors"]);
     }
 
     public function testAddExistedCourse()
     {
         $client = $this->getClient();
+        $translator = static::getContainer()->get('translator');
         $courseRepository = $this->getContainer()->get(CourseRepository::class);
         $userRepository = $this->getContainer()->get(UserRepository::class);
         $userRepo = $userRepository->findOneBy(['email' => 'admin@study.com']);
@@ -709,13 +745,18 @@ class CourseApiTest extends \App\Tests\AbstractTest
             );
             $courseContent = json_decode($client->getResponse()->getContent(), true);
             $this->assertResponseCode(406);
-            $this->assertContains(ErrorTemplate::COURSE_EXIST_TEXT, $courseContent["errors"]);
+            $this->assertContains($translator->trans(
+                'errors.course.slug.non_unique',
+                [],
+                'validators'
+            ), $courseContent["errors"]);
         }
     }
 
     public function testAddWithUnuathOrUsualUser()
     {
         $client = $this->getClient();
+        $translator = static::getContainer()->get('translator');
         $client->request(
             'POST',
             "/api/v1/courses",
@@ -728,7 +769,11 @@ class CourseApiTest extends \App\Tests\AbstractTest
         );
         $courseContent = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseCode(403);
-        $this->assertSame(ErrorTemplate::ACCESS_RIGHT_TEXT, $courseContent["message"]);
+        $this->assertSame($translator->trans(
+            'errors.user.access_denied',
+            [],
+            'validators'
+        ), $courseContent["message"]);
         $client->request(
             'POST',
             '/api/v1/auth',
@@ -753,12 +798,17 @@ class CourseApiTest extends \App\Tests\AbstractTest
         );
         $courseContent = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseCode(403);
-        $this->assertSame(ErrorTemplate::ACCESS_RIGHT_TEXT, $courseContent["message"]);
+        $this->assertSame($translator->trans(
+            'errors.user.access_denied',
+            [],
+            'validators'
+        ), $courseContent["message"]);
     }
 
     public function testEditNotExisted()
     {
         $client = $this->getClient();
+        $translator = static::getContainer()->get('translator');
         $client->request(
             'POST',
             '/api/v1/auth',
@@ -783,6 +833,10 @@ class CourseApiTest extends \App\Tests\AbstractTest
         );
         $courseContent = json_decode($client->getResponse()->getContent(), true);
         $this->assertResponseCode(404);
-        $this->assertSame(ErrorTemplate::COURSE_DOESNT_EXIST_TEXT, $courseContent["message"]);
+        $this->assertSame($translator->trans(
+            'errors.course.doesnt_exist',
+            [],
+            'validators'
+        ), $courseContent["message"]);
     }
 }

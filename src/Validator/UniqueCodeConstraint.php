@@ -10,7 +10,7 @@ use Symfony\Component\Validator\Constraint;
  */
 class UniqueCodeConstraint extends Constraint
 {
-    public string $message = ErrorTemplate::COURSE_EXIST_TEXT;
+    public string $message = "errors.course.slug.non_unique";
 
     public function validatedBy(): string
     {

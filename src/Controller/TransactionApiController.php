@@ -15,31 +15,27 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @Route("/api/v1/transactions")
  */
 class TransactionApiController extends AbstractController
 {
-    private CourseRepository $courseRepository;
-
     private TransactionRepository $transactionRepository;
 
     private SerializerInterface $serializer;
 
-    private ValidatorInterface $validator;
+    private TranslatorInterface $translator;
 
     public function __construct(
-        CourseRepository $courseRepository,
         TransactionRepository $transactionRepository,
         SerializerInterface $serializer,
-        ValidatorInterface $validator
+        TranslatorInterface $translator
     ) {
         $this->serializer = $serializer;
-        $this->courseRepository = $courseRepository;
         $this->transactionRepository = $transactionRepository;
-        $this->validator = $validator;
+        $this->translator = $translator;
     }
 
     /**
@@ -135,7 +131,7 @@ class TransactionApiController extends AbstractController
      *        ),
      *     )
      * )
-     * @OA\Tag(name="CourseApi")
+     * @OA\Tag(name="TransactionsApi")
      * @Security(name="Bearer")
      */
     public function transactions(Request $request): JsonResponse
@@ -144,7 +140,7 @@ class TransactionApiController extends AbstractController
         if (!$user) {
             return new JsonResponse([
                 'code' => Response::HTTP_UNAUTHORIZED,
-                'message' => ErrorTemplate::USER_UNAUTH_TEXT,
+                'message' => $this->translator->trans('errors.user.doesnt_auth', [], 'validators'),
             ], Response::HTTP_FORBIDDEN);
         }
 

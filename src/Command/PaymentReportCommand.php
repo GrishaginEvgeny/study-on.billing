@@ -15,6 +15,7 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 class PaymentReportCommand extends Command
 {
@@ -24,6 +25,7 @@ class PaymentReportCommand extends Command
     private $twig;
     private TransactionRepository $transactionRepository;
     private MailerInterface $mailer;
+    private TranslatorInterface $translator;
 
     protected function configure(): void
     {
@@ -33,11 +35,13 @@ class PaymentReportCommand extends Command
         Twig $twig,
         TransactionRepository $transactionRepository,
         UserRepository $userRepository,
-        MailerInterface $mailer
+        MailerInterface $mailer,
+        TranslatorInterface $translator
     ) {
         $this->twig = $twig;
         $this->transactionRepository = $transactionRepository;
         $this->mailer = $mailer;
+        $this->translator = $translator;
         parent::__construct();
     }
 
@@ -71,19 +75,19 @@ class PaymentReportCommand extends Command
                 $email = (new Email())
                     ->to(new Address($_ENV['REPORT_MAIL']))
                     ->from(new Address($_ENV['ADMIN_MAIL']))
-                    ->subject("Отчет об оплаченных курсах в период {$strStart} -- {$strEnd}.")
+                    ->subject($this->translator->trans('command.report.template') . " {$strStart} -- {$strEnd}.")
                     ->html($report);
 
                 $this->mailer->send($email);
             } catch (TransportExceptionInterface $e) {
                 $io->error($e->getMessage());
-                $io->error('Ошибка при формировании и отправке отчета.');
+                $io->error($this->translator->trans('errors.command.report', [], 'validators'));
 
                 return Command::FAILURE;
             }
         }
 
-        $io->success('Отчёт успешно отправлен');
+        $io->success($this->translator->trans('command.report.success'));
         return Command::SUCCESS;
     }
 }

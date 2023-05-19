@@ -20,6 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @Route("/api/v1")
@@ -40,6 +41,8 @@ class UserApiController extends AbstractController
 
     private PaymentService $paymentService;
 
+    private TranslatorInterface $translator;
+
     public function __construct(
         ValidatorInterface $validator,
         UserPasswordHasherInterface $hasher,
@@ -47,7 +50,8 @@ class UserApiController extends AbstractController
         UserRepository $userRepository,
         RefreshTokenGeneratorInterface $refreshTokenGenerator,
         RefreshTokenManagerInterface $refreshTokenManager,
-        PaymentService $paymentService
+        PaymentService $paymentService,
+        TranslatorInterface $translator
     ) {
         $this->validator = $validator;
         $this->hasher = $hasher;
@@ -56,6 +60,7 @@ class UserApiController extends AbstractController
         $this->refreshTokenGenerator = $refreshTokenGenerator;
         $this->refreshTokenManager = $refreshTokenManager;
         $this->paymentService = $paymentService;
+        $this->translator = $translator;
     }
 
     /**
@@ -156,7 +161,8 @@ class UserApiController extends AbstractController
      *        @OA\Property(
      *           property="password",
      *          type="string",
-     *          description="Пароль пользователя соответствующий данному регулярному выражению: /(?=.*[0-9])(?=.*[.!@#$%^&*])(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z!@#$%^&*.]+$/.",
+     *          description="Пароль пользователя соответствующий данному регулярному выражению:
+    /(?=.*[0-9])(?=.*[.!@#$%^&*])(?=.*[a-z])(?=.*[A-Z])[0-9a-zA-Z!@#$%^&*.]+$/.",
      *          example="ABc!33113a",
      *        ),
      *     )
@@ -222,7 +228,7 @@ class UserApiController extends AbstractController
         if (count($errorsFromDto) > 0) {
             $errors = [];
             foreach ($errorsFromDto as $error) {
-                $errors[$error->getPropertyPath()] = $error->getMessage();
+                $errors[$error->getPropertyPath()] = $this->translator->trans($error->getMessage(), [], 'validators');
             }
             return new JsonResponse([
                 'code' => Response::HTTP_BAD_REQUEST,
@@ -234,7 +240,7 @@ class UserApiController extends AbstractController
             return new JsonResponse([
                 'code' => Response::HTTP_BAD_REQUEST,
                 'errors' => [
-                    "username" => ErrorTemplate::NOT_UNIQUE_EMAIL_TEXT
+                    "username" => $this->translator->trans('errors.user.email.non_unique', [], 'validators')
                 ],
             ], Response::HTTP_BAD_REQUEST);
         }
@@ -263,7 +269,8 @@ class UserApiController extends AbstractController
      * @OA\Get(
      *     path="/api/v1/users/current",
      *     summary="Получение актуального авторизированного пользоватея",
-     *     description="Запрос на получение актуального авторизированного пользователя. При выполнении запроса будучи неавторизированным будет возвращена ошибка.
+     *     description="Запрос на получение актуального авторизированного пользователя.
+          При выполнении запроса будучи неавторизированным будет возвращена ошибка.
     При выполнении запроса при авторизированном пользователе будет возвращена информация о пользователе."
      * )
      * @OA\Response(
@@ -329,7 +336,7 @@ class UserApiController extends AbstractController
         if (!$this->getUser()) {
             return new JsonResponse([
                 'code' => Response::HTTP_UNAUTHORIZED,
-                "message" => "JWT Token not found"
+                "message" => $this->translator->trans('errors.user.jwt_token_not_found', [], 'validators')
             ], Response::HTTP_OK);
         }
 

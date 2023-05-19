@@ -1,0 +1,8 @@
+nelmio_api_doc:
+  areas:
+    default:
+      disable_default_routes: true
+  documentation:
+    info:
+      title: Study-On-Billing Api Docs
+      version: "1"

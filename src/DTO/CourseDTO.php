@@ -5,6 +5,7 @@ namespace App\DTO;
 use App\ErrorTemplate\ErrorTemplate;
 use App\Validator\UniqueCodeConstraint;
 use JMS\Serializer\Annotation as Serializer;
+use Symfony\Component\Translation\Translator;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
@@ -15,11 +16,11 @@ class CourseDTO
      * @Assert\Length(
      *     min=1,
      *     max=255,
-     *     minMessage="Поле Cимвольный код не должно быть пустым.",
-     *     maxMessage="Поле Cимвольный код не должно длинной более {{ limit }} символов.")
+     *     minMessage="errors.course.slug.too_tiny",
+     *     maxMessage="errors.course.slug.too_big")
      * @Assert\Regex(
      *     pattern="/^[A-Za-z0-9]+$/",
-     *     message="В поле Cимвольный код могут содержаться только цифры и латиница.")
+     *     message="errors.course.slug.wrong_regex")
      * @UniqueCodeConstraint()
      */
     public string $code;
@@ -34,8 +35,8 @@ class CourseDTO
      * @Assert\Length(
      *     min=1,
      *     max=255,
-     *     minMessage="Поле Название не должно быть пустым.",
-     *     maxMessage="Поле Название не должно длинной более {{ limit }} символов.")
+     *     minMessage="errors.course.name.too_tiny",
+     *     maxMessage="errors.course.name.too_big")
      */
     public string $title;
 
@@ -49,23 +50,30 @@ class CourseDTO
      */
     public function validate(ExecutionContextInterface $context): void
     {
+
         if ($this->type === 'free' && $this->price != 0) {
             $context
-                ->buildViolation(ErrorTemplate::FREE_WITH_PRICE_TEXT)
+                ->buildViolation("errors.course.price.free_with_cost")
+                ->setTranslationDomain('validators')
+                ->setParameters([])
                 ->atPath('price')
                 ->addViolation();
         }
 
         if (($this->type === 'rent' || $this->type === 'buy') && $this->price <= 0) {
             $context
-                ->buildViolation(ErrorTemplate::COSTABLE_WITH_ZERO_COST_TEXT)
+                ->buildViolation("errors.course.price.buyable_without_cost")
+                ->setTranslationDomain('validators')
+                ->setParameters([])
                 ->atPath('price')
                 ->addViolation();
         }
 
         if (!in_array($this->type, ['rent', 'free', 'buy'])) {
             $context
-                ->buildViolation(ErrorTemplate::WRONG_TYPE_TEXT)
+                ->buildViolation("errors.course.type.wrong_type")
+                ->setTranslationDomain('validators')
+                ->setParameters([])
                 ->atPath('type')
                 ->addViolation();
         }

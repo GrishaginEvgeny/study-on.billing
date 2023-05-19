@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Tests;
+
 use App\Repository\UserRepository;
 use App\Tests\AbstractTest;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -22,6 +24,7 @@ class UserApiTest extends AbstractTest
     public function testInvalidCredentialsAuth(): void
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         $client->request(
             'POST',
             '/api/v1/auth',
@@ -31,7 +34,11 @@ class UserApiTest extends AbstractTest
             json_encode(['username' => '123', 'password' => '123'])
         );
         $content = json_decode($client->getResponse()->getContent(), true);
-        $this->assertSame("Invalid credentials.", $content['message']);
+        $this->assertSame($translator->trans(
+            "errors.user.invalid_credentials",
+            [],
+            'validators'
+        ), $content['message']);
         $this->assertResponseCode(401);
     }
 
@@ -56,6 +63,7 @@ class UserApiTest extends AbstractTest
     public function testRegisterInvalidEmail(): void
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         $client->request(
             'POST',
             '/api/v1/register',
@@ -68,12 +76,17 @@ class UserApiTest extends AbstractTest
         $content['errors'] = (array)$content['errors'];
         $this->assertNotCount(0, $content['errors']);
         $this->assertArrayHasKey('username', $content['errors']);
-        $this->assertSame("Поле e-mail содержит некорректные данные.", $content['errors']['username']);
+        $this->assertSame($translator->trans(
+            "errors.user.email.wrong_email",
+            [],
+            'validators'
+        ), $content['errors']['username']);
     }
 
     public function testRegisterBlankEmail(): void
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         $client->request(
             'POST',
             '/api/v1/register',
@@ -86,12 +99,17 @@ class UserApiTest extends AbstractTest
         $content['errors'] = (array)$content['errors'];
         $this->assertNotCount(0, $content['errors']);
         $this->assertArrayHasKey('username', $content['errors']);
-        $this->assertSame("Поле e-mail не может быт пустым.", $content['errors']['username']);
+        $this->assertSame($translator->trans(
+            "errors.user.email.non_blank",
+            [],
+            'validators'
+        ), $content['errors']['username']);
     }
 
     public function testRegisterInvalidPassword(): void
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         $client->request(
             'POST',
             '/api/v1/register',
@@ -105,8 +123,11 @@ class UserApiTest extends AbstractTest
         $this->assertNotCount(0, $content['errors']);
         $this->assertArrayHasKey('password', $content['errors']);
         $this->assertSame(
-            "Пароль должен содержать как один из спец. символов (.!@#$%^&*), " .
-            "прописную и строчные буквы латинского алфавита и цифру.",
+            $translator->trans(
+                "errors.user.password.wrong_regex",
+                [],
+                'validators'
+            ),
             $content['errors']['password']
         );
     }
@@ -114,6 +135,7 @@ class UserApiTest extends AbstractTest
     public function testRegisterWithPasswordWhichHaveLengthLessThenConstraint(): void
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         $client->request(
             'POST',
             '/api/v1/register',
@@ -127,8 +149,38 @@ class UserApiTest extends AbstractTest
         $this->assertNotCount(0, $content['errors']);
         $this->assertArrayHasKey('password', $content['errors']);
         $this->assertSame(
-            "Пароль должен содержать минимум 6 символов.",
+            $translator->trans(
+                "errors.user.password.too_tiny",
+                [],
+                'validators'
+            ),
             $content['errors']['password']
+        );
+    }
+
+    public function testRegisterWithExistedEmail(): void
+    {
+        $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
+        $client->request(
+            'POST',
+            '/api/v1/register',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['username' => 'admin@study.com', 'password' => 'Aaaaaa1.'])
+        );
+        $content = json_decode($client->getResponse()->getContent(), true);
+        $content['errors'] = (array)$content['errors'];
+        $this->assertNotCount(0, $content['errors']);
+        $this->assertArrayHasKey('username', $content['errors']);
+        $this->assertSame(
+            $translator->trans(
+                "errors.user.email.non_unique",
+                [],
+                'validators'
+            ),
+            $content['errors']['username']
         );
     }
 
@@ -153,11 +205,12 @@ class UserApiTest extends AbstractTest
     public function testGetUserWithUnAuth()
     {
         $client = $this->getClient();
+        $translator = $this->getContainer()->get('translator');
         $client->request('GET', '/api/v1/users/current');
         $this->assertResponseCode(401);
         $content = json_decode($client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('message', $content);
-        $this->assertSame("JWT Token not found", $content['message']);
+        $this->assertSame('JWT Token not found', $content['message']);
     }
 
     public function testGetUserWithAuth()

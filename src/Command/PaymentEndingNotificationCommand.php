@@ -15,6 +15,7 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 class PaymentEndingNotificationCommand extends Command
 {
@@ -25,17 +26,20 @@ class PaymentEndingNotificationCommand extends Command
     private TransactionRepository $transactionRepository;
     private UserRepository $userRepository;
     private MailerInterface $mailer;
+    private TranslatorInterface $translator;
 
     public function __construct(
         Twig $twig,
         TransactionRepository $transactionRepository,
         UserRepository $userRepository,
-        MailerInterface $mailer
+        MailerInterface $mailer,
+        TranslatorInterface $translator
     ) {
         $this->twig = $twig;
         $this->transactionRepository = $transactionRepository;
         $this->userRepository = $userRepository;
         $this->mailer = $mailer;
+        $this->translator = $translator;
         parent::__construct();
     }
 
@@ -62,21 +66,22 @@ class PaymentEndingNotificationCommand extends Command
                     $email = (new Email())
                         ->to(new Address($user->getEmail()))
                         ->from(new Address($_ENV['ADMIN_MAIL']))
-                        ->subject('Окончание срока аренды ваших курсов на Study-On.')
+                        ->subject($this->translator->trans('command.expired.template'))
                         ->html($report);
 
                     $this->mailer->send($email);
                 } catch (TransportExceptionInterface $e) {
                     $io->error($e->getMessage());
                     $io->error(
-                        'Ошибка при формировании и отправке упоминания пользователю ' . $user->getEmail() . '.'
+                        $this->translator->trans('errors.command.expired', [], 'validators')
+                        . ' ' . $user->getEmail() . '.'
                     );
 
                     return Command::FAILURE;
                 }
             }
         }
-        $io->success('Уведомления успешно отправлены!');
+        $io->success($this->translator->trans('command.expired.success'));
         return Command::SUCCESS;
     }
 }

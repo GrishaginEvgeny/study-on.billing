@@ -6,7 +6,6 @@ use App\DTO\CourseDTO;
 use App\DTO\CourseEditDTO;
 use App\DTO\PayDTO;
 use App\Entity\Course;
-use App\ErrorTemplate\ErrorTemplate;
 use App\Repository\CourseRepository;
 use App\Repository\TransactionRepository;
 use App\Services\PaymentService;
@@ -19,6 +18,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @Route("/api/v1/courses")
@@ -33,16 +33,20 @@ class CourseApiController extends AbstractController
 
     private ValidatorInterface $validator;
 
+    private TranslatorInterface $translator;
+
     public function __construct(
         CourseRepository $courseRepository,
         PaymentService $paymentService,
         SerializerInterface $serializer,
-        ValidatorInterface $validator
+        ValidatorInterface $validator,
+        TranslatorInterface $translator
     ) {
         $this->serializer = $serializer;
         $this->courseRepository = $courseRepository;
         $this->paymentService = $paymentService;
         $this->validator = $validator;
+        $this->translator = $translator;
     }
 
     /**
@@ -170,7 +174,7 @@ class CourseApiController extends AbstractController
         if (!$course) {
             return new JsonResponse([
                 'code' => Response::HTTP_NOT_FOUND,
-                'message' => ErrorTemplate::COURSE_DOESNT_EXIST_TEXT
+                'message' => $this->translator->trans('errors.course.doesnt_exist', [], 'validators')
             ], Response::HTTP_NOT_FOUND);
         }
         return new JsonResponse([
@@ -284,14 +288,14 @@ class CourseApiController extends AbstractController
         if (!$course) {
             return new JsonResponse([
                 'code' => Response::HTTP_NOT_FOUND,
-                'message' => ErrorTemplate::COURSE_DOESNT_EXIST_TEXT
+                'message' => $this->translator->trans('errors.course.doesnt_exist', [], 'validators')
             ], Response::HTTP_NOT_FOUND);
         }
 
         if (!$user) {
             return new JsonResponse([
                 'code' => Response::HTTP_UNAUTHORIZED,
-                'message' => ErrorTemplate::USER_UNAUTH_TEXT
+                'message' => $this->translator->trans('errors.user.doesnt_auth', [], 'validators')
             ], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -300,7 +304,7 @@ class CourseApiController extends AbstractController
         if (count($errorsFromDto) > 0) {
             $errors = [];
             foreach ($errorsFromDto as $error) {
-                $errors[] = $error->getMessage();
+                $errors[] = $this->translator->trans($error->getMessage(), [], 'validators');
             }
             return new JsonResponse([
                 'code' => Response::HTTP_NOT_ACCEPTABLE,
@@ -395,16 +399,17 @@ class CourseApiController extends AbstractController
         if (!$this->getUser() || !in_array('ROLE_SUPER_ADMIN', $this->getUser()->getRoles(), true)) {
             return new JsonResponse([
                 "code" => Response::HTTP_FORBIDDEN,
-                "message" => ErrorTemplate::ACCESS_RIGHT_TEXT
+                "message" => $this->translator->trans('errors.user.access_denied', [], 'validators')
             ], Response::HTTP_FORBIDDEN);
         }
         $courseDTO = $this->serializer
             ->deserialize($request->getContent(), CourseDTO::class, 'json');
-        $errorsFromDto = $this->validator->validate($courseDTO);
+        $errorsFromDto = $this->validator
+            ->validate($courseDTO);
         if (count($errorsFromDto) > 0) {
             $errors = [];
             foreach ($errorsFromDto as $error) {
-                $errors[$error->getPropertyPath()] = $error->getMessage();
+                $errors[$error->getPropertyPath()] = $this->translator->trans($error->getMessage(), [], 'validators');
             }
             return new JsonResponse([
                 'code' => Response::HTTP_NOT_ACCEPTABLE,
@@ -515,7 +520,7 @@ class CourseApiController extends AbstractController
         if (!$this->getUser() || !in_array('ROLE_SUPER_ADMIN', $this->getUser()->getRoles(), true)) {
             return new JsonResponse([
                 "code" => Response::HTTP_FORBIDDEN,
-                "message" => ErrorTemplate::ACCESS_RIGHT_TEXT
+                "message" => $this->translator->trans('errors.user.access_denied', [], 'validators')
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -523,7 +528,7 @@ class CourseApiController extends AbstractController
         if (is_null($course)) {
             return new JsonResponse([
                 "code" => Response::HTTP_NOT_FOUND,
-                "message" => ErrorTemplate::COURSE_DOESNT_EXIST_TEXT
+                "message" => $this->translator->trans('errors.course.doesnt_exist', [], 'validators')
             ], Response::HTTP_NOT_FOUND);
         }
 
@@ -533,11 +538,15 @@ class CourseApiController extends AbstractController
         if (count($errorsFromDto) > 0) {
             $errors = [];
             foreach ($errorsFromDto as $error) {
-                $errors[$error->getPropertyPath()] = $error->getMessage();
+                $errors[$error->getPropertyPath()] = $this->translator->trans($error->getMessage(), [], 'validators');
             }
             if (
                 !(count($errors) === 1 &&
-                in_array(ErrorTemplate::COURSE_EXIST_TEXT, $errors) &&
+                    in_array(
+                        $this->translator->trans('errors.course.doesnt_exist', [], 'validators'),
+                        $errors,
+                        true
+                    ) &&
                 $code === $courseDTO->code)
             ) {
                 return new JsonResponse([
